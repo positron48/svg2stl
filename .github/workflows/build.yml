@@ -1,0 +1,111 @@
+name: Build SVG to STL Converter
+
+on:
+  push:
+    tags:
+      - '*' # При публикации тега с версией (например v1.0.0)
+  workflow_dispatch: # Для ручного запуска
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: svg2stl-linux
+            asset_name: svg2stl-linux
+          - os: windows-latest
+            artifact_name: svg2stl-windows.exe
+            asset_name: svg2stl-windows
+          - os: macos-latest
+            artifact_name: svg2stl-macos
+            asset_name: svg2stl-macos
+
+    steps:
+    - name: Checkout код
+      uses: actions/checkout@v3
+
+    - name: Настройка Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Установка зависимостей
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Сборка с PyInstaller (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
+
+    - name: Сборка с PyInstaller (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
+
+    - name: Загрузить артефакты сборки
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.asset_name }}
+        path: dist/${{ matrix.artifact_name }}*
+
+  release:
+    name: Создание релиза
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout код
+      uses: actions/checkout@v3
+      
+    - name: Создание релиза
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+      
+    - name: Скачать все артефакты
+      uses: actions/download-artifact@v3
+      
+    - name: Загрузить Linux бинарник в релиз
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./svg2stl-linux/svg2stl-linux
+        asset_name: svg2stl-linux
+        asset_content_type: application/octet-stream
+        
+    - name: Загрузить Windows бинарник в релиз
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./svg2stl-windows/svg2stl-windows.exe
+        asset_name: svg2stl-windows.exe
+        asset_content_type: application/octet-stream
+        
+    - name: Загрузить macOS бинарник в релиз
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./svg2stl-macos/svg2stl-macos
+        asset_name: svg2stl-macos
+        asset_content_type: application/octet-stream 

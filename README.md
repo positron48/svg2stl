@@ -1,0 +1,117 @@
+# SVG to STL Converter
+
+A Python script for converting SVG files (specifically PCB mask negatives exported from KiCad) to STL 3D models for photopolymer printing.
+
+[Русская версия документации](readme.md)
+
+## Description
+
+This tool automates the process of converting SVG files exported from KiCad (with black fill representing the PCB mask negative) into accurate 3D models in STL format for use with photopolymer printers like the Photon Mono X6KS.
+
+## Installation & Usage
+
+### Option 1: Pre-built Binaries
+
+Download a ready-to-use executable for your operating system from the [releases section](https://github.com/YOURNAME/svg-to-stl/releases):
+
+- **Windows**: svg2stl-windows.exe
+- **macOS**: svg2stl-macos
+- **Linux**: svg2stl-linux
+
+After downloading:
+- **Windows**: Simply double-click the exe file
+- **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
+
+### Option 2: Run from Source Code
+
+Requires Python 3.7 or higher and the following packages:
+```
+numpy
+cairosvg
+pillow
+numpy-stl
+tqdm
+```
+
+Install dependencies:
+```
+pip install -r requirements.txt
+```
+
+Run:
+```
+python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
+```
+
+## Features
+
+- Convert SVG files to high-quality STL 3D models
+- Precise extraction of only black elements from SVG (PCB traces and outlines)
+- Automatic cropping to actual content boundaries, significantly reducing model size
+- Advanced 3D model optimization by merging adjacent pixels into a minimal number of rectangles
+- Process individual files or all SVG files in the current directory
+- Configurable parameters for thickness and pixel size (resolution)
+- Automatic calculation of optimal DPI for rasterization based on pixel size
+- Progress indicator for tracking the conversion process
+
+## Command Line Arguments
+
+- `--thickness`: Thickness of the resulting 3D model in mm (default: 1.0)
+- `--pixel_size`: Size of each pixel in mm (default: 0.05). Determines rasterization resolution and model detail
+- `--debug`: Save cropped image for checking
+- `--all`: Process all SVG files in the current directory
+
+## Examples
+
+Convert a single SVG file:
+```
+svg2stl input.svg --thickness 1.0 --pixel_size 0.05
+```
+
+Convert all SVG files in the current directory:
+```
+svg2stl --all --thickness 1.0 --pixel_size 0.05
+```
+
+Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (600 DPI):
+```
+svg2stl board-F_Cu.svg --thickness 0.8 --pixel_size 0.05
+```
+
+Process all SVG files with very high resolution (1200 DPI):
+```
+svg2stl --all --thickness 1.0 --pixel_size 0.025
+```
+
+Quick processing of a large file with lower resolution (300 DPI):
+```
+svg2stl large-board.svg --thickness 1.0 --pixel_size 0.1
+```
+
+## Performance Recommendations
+
+The pixel size (`pixel_size`) fully determines the resolution and detail of the model:
+
+| Pixel Size | Calculated DPI | Quality | File Size | Processing Time |
+|------------|----------------|---------|-----------|-----------------|
+| 0.025 mm   | 1200 DPI       | Very High | ~5 MB   | ~4 sec          |
+| 0.05 mm    | 600 DPI        | High    | ~3 MB     | ~2 sec          |
+| 0.1 mm     | 300 DPI        | Medium  | ~2 MB     | ~1 sec          |
+| 0.2 mm     | 150 DPI        | Low     | ~1 MB     | <1 sec          |
+
+The formula used is: `DPI = 30 / pixel_size`
+
+## Building from Source
+
+To create your own binary file from the source code, you can use PyInstaller:
+
+```
+pip install pyinstaller
+pyinstaller --onefile svg2stl.py
+```
+
+The executable file will be created in the `dist/` folder.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
