@@ -3,7 +3,7 @@ name: Build SVG to STL Converter
 on:
   push:
     tags:
-      - '*' # При публикации тега с версией (например v1.0.0)
+      - 'v*' # При публикации тега с версией (например v1.0.0)
   workflow_dispatch: # Для ручного запуска
 
 jobs:
@@ -26,10 +26,10 @@ jobs:
 
     steps:
     - name: Checkout код
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Настройка Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
         cache: 'pip'
@@ -51,7 +51,7 @@ jobs:
         pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
 
     - name: Загрузить артефакты сборки
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.asset_name }}
         path: dist/${{ matrix.artifact_name }}*
@@ -61,51 +61,28 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout код
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Создание релиза
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        name: Release ${{ github.ref_name }}
         draft: false
         prerelease: false
+        generate_release_notes: true
       
     - name: Скачать все артефакты
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       
-    - name: Загрузить Linux бинарник в релиз
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Загрузить артефакты в релиз
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./svg2stl-linux/svg2stl-linux
-        asset_name: svg2stl-linux
-        asset_content_type: application/octet-stream
-        
-    - name: Загрузить Windows бинарник в релиз
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./svg2stl-windows/svg2stl-windows.exe
-        asset_name: svg2stl-windows.exe
-        asset_content_type: application/octet-stream
-        
-    - name: Загрузить macOS бинарник в релиз
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./svg2stl-macos/svg2stl-macos
-        asset_name: svg2stl-macos
-        asset_content_type: application/octet-stream 
+        files: |
+          svg2stl-linux/svg2stl-linux
+          svg2stl-windows/svg2stl-windows.exe
+          svg2stl-macos/svg2stl-macos 
