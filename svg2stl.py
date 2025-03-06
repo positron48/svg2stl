@@ -15,6 +15,9 @@ from stl import mesh
 import time
 from tqdm import tqdm
 
+# Константы для преобразования
+MM_PER_INCH = 25.4  # 1 дюйм = 25.4 мм
+
 def calculate_dpi(pixel_size):
     """
     Расчет DPI на основе размера пикселя в мм.
@@ -85,133 +88,200 @@ def crop_to_content(img, threshold=240, debug=False):
         
     return cropped
 
-def create_heightmap_mesh(mask, thickness, pixel_size):
-    """Create a mesh using a heightmap approach (more efficient)."""
+def find_maximal_rectangles(mask, min_rect_size=2):
+    """
+    Находит максимальные прямоугольники в бинарной маске.
+    
+    Этот алгоритм находит прямоугольники, которые могут быть созданы из смежных пикселей,
+    что позволяет значительно сократить количество полигонов в итоговой 3D-модели.
+    
+    Args:
+        mask: Бинарная маска (numpy array), True для содержимого
+        min_rect_size: Минимальный размер прямоугольника (площадь в пикселях)
+        
+    Returns:
+        Список прямоугольников в формате (x, y, width, height)
+    """
+    height, width = mask.shape
+    print("Finding maximal rectangles...")
+    
+    # Вспомогательная матрица высот
+    heights = np.zeros((height, width), dtype=int)
+    
+    # Для каждой строки вычисляем "высоту" столбца (сколько последовательных True вверх)
+    for y in range(height):
+        for x in range(width):
+            if mask[y, x]:
+                if y > 0:
+                    heights[y, x] = heights[y-1, x] + 1
+                else:
+                    heights[y, x] = 1
+    
+    # Список найденных прямоугольников (x, y, width, height)
+    rectangles = []
+    
+    # Используем подход "максимальных прямоугольников"
+    for y in range(height):
+        # Для каждой строки ищем максимальные прямоугольники по высотам
+        stack = []  # Стек для слежения за потенциальными прямоугольниками
+        
+        for x in range(width + 1):  # +1 чтобы "закрыть" прямоугольники в последнем столбце
+            # Высота в текущей позиции (0 за пределами массива или если элемент не входит в маску)
+            h = heights[y, x-1] if x > 0 and x < width and mask[y, x-1] else 0
+            
+            # Обрабатываем прямоугольники из стека, которые выше текущего
+            start_pos = x
+            while stack and stack[-1][1] > h:
+                pos, height_at_pos = stack.pop()
+                width_of_rect = x - pos
+                
+                # Создаем прямоугольник только если его площадь достаточно большая
+                area = width_of_rect * height_at_pos
+                if area >= min_rect_size:
+                    rectangles.append((pos, y - height_at_pos + 1, width_of_rect, height_at_pos))
+                
+                start_pos = pos
+            
+            # Если текущая высота ненулевая, добавляем в стек
+            if h > 0:
+                stack.append((start_pos, h))
+    
+    # Выполняем дополнительное объединение прямоугольников, где это возможно
+    # (это может сократить количество прямоугольников до 10 раз)
+    optimized_rectangles = optimize_rectangles(rectangles, mask, min_rect_size * 2)
+    
+    print(f"Initial rectangles: {len(rectangles)}, after optimization: {len(optimized_rectangles)}")
+    return optimized_rectangles
+
+def optimize_rectangles(rectangles, mask, min_area=4):
+    """
+    Оптимизирует список прямоугольников, объединяя их в более крупные блоки.
+    
+    Алгоритм пытается найти прямоугольники, которые можно объединить в более 
+    крупные прямоугольники для значительного сокращения количества полигонов.
+    
+    Args:
+        rectangles: Список прямоугольников в формате (x, y, width, height)
+        mask: Исходная бинарная маска
+        min_area: Минимальная площадь прямоугольника для сохранения
+        
+    Returns:
+        Оптимизированный список прямоугольников
+    """
+    # Сортируем прямоугольники по площади (от большего к меньшему)
+    rectangles = sorted(rectangles, key=lambda r: r[2] * r[3], reverse=True)
+    
+    # Создаем маску для отслеживания уже покрытых пикселей
+    height, width = mask.shape
+    covered = np.zeros((height, width), dtype=bool)
+    
+    # Итоговый набор оптимизированных прямоугольников
+    optimal_rectangles = []
+    
+    # Рассматриваем каждый прямоугольник
+    for rect in rectangles:
+        x, y, w, h = rect
+        
+        # Проверяем, остались ли непокрытые пиксели в этом прямоугольнике
+        area_mask = covered[y:y+h, x:x+w]
+        if np.all(area_mask):
+            # Все пиксели уже покрыты, пропускаем
+            continue
+        
+        # Вычисляем процент непокрытых пикселей
+        uncovered_pixels = np.count_nonzero(~area_mask)
+        total_pixels = w * h
+        
+        # Добавляем прямоугольник, если он покрывает достаточно непокрытых пикселей
+        # или если он достаточно большой
+        if uncovered_pixels / total_pixels > 0.2 or total_pixels >= min_area:
+            optimal_rectangles.append(rect)
+            # Отмечаем пиксели как покрытые
+            covered[y:y+h, x:x+w] = True
+    
+    return optimal_rectangles
+
+def create_optimized_mesh(mask, thickness, pixel_size):
+    """
+    Создает оптимизированный меш, объединяя соседние пиксели в прямоугольники.
+    
+    Args:
+        mask: Бинарная маска (numpy array), True для содержимого
+        thickness: Толщина 3D-модели в мм
+        pixel_size: Размер пикселя в мм
+        
+    Returns:
+        vertices, faces: Массивы вершин и граней для меша
+    """
     height, width = mask.shape
     
-    # Create a grid of vertices
-    x = np.arange(0, width) * pixel_size
-    y = np.arange(0, height) * pixel_size
-    xx, yy = np.meshgrid(x, y)
+    # Найти максимальные прямоугольники в маске
+    rectangles = find_maximal_rectangles(mask)
     
-    # Flip Y coordinates (PIL origin is top-left, we want bottom-left for 3D)
-    yy = (height - 1) * pixel_size - yy
+    # Создать вершины и грани для каждого прямоугольника
+    all_vertices = []
+    all_faces = []
+    vertex_count = 0
     
-    # Create bottom and top vertices
-    bottom_vertices = np.column_stack((xx.flatten(), yy.flatten(), np.zeros(width * height)))
-    top_vertices = np.column_stack((xx.flatten(), yy.flatten(), np.ones(width * height) * thickness))
+    for rect in tqdm(rectangles, desc="Creating mesh"):
+        x, y, w, h = rect
+        
+        # Вычисляем координаты вершин в мм
+        # Переворачиваем ось Y (в PIL начало координат в верхнем левом углу, 
+        # а нам нужно в нижнем левом для 3D)
+        x_pos = x * pixel_size
+        y_pos = (height - y - h) * pixel_size
+        
+        # Ширина и высота прямоугольника в мм
+        w_mm = w * pixel_size
+        h_mm = h * pixel_size
+        
+        # Создаем 8 вершин для прямоугольного блока (куба)
+        # Нижняя грань (z=0)
+        v0 = [x_pos, y_pos, 0]
+        v1 = [x_pos + w_mm, y_pos, 0]
+        v2 = [x_pos + w_mm, y_pos + h_mm, 0]
+        v3 = [x_pos, y_pos + h_mm, 0]
+        
+        # Верхняя грань (z=thickness)
+        v4 = [x_pos, y_pos, thickness]
+        v5 = [x_pos + w_mm, y_pos, thickness]
+        v6 = [x_pos + w_mm, y_pos + h_mm, thickness]
+        v7 = [x_pos, y_pos + h_mm, thickness]
+        
+        vertices = [v0, v1, v2, v3, v4, v5, v6, v7]
+        all_vertices.extend(vertices)
+        
+        # Создаем грани (треугольники)
+        # Нижняя грань
+        all_faces.append([vertex_count, vertex_count+1, vertex_count+2])
+        all_faces.append([vertex_count, vertex_count+2, vertex_count+3])
+        
+        # Верхняя грань
+        all_faces.append([vertex_count+4, vertex_count+6, vertex_count+5])
+        all_faces.append([vertex_count+4, vertex_count+7, vertex_count+6])
+        
+        # Боковые грани
+        # Спереди
+        all_faces.append([vertex_count+3, vertex_count+2, vertex_count+6])
+        all_faces.append([vertex_count+3, vertex_count+6, vertex_count+7])
+        
+        # Сзади
+        all_faces.append([vertex_count+0, vertex_count+5, vertex_count+1])
+        all_faces.append([vertex_count+0, vertex_count+4, vertex_count+5])
+        
+        # Справа
+        all_faces.append([vertex_count+1, vertex_count+5, vertex_count+6])
+        all_faces.append([vertex_count+1, vertex_count+6, vertex_count+2])
+        
+        # Слева
+        all_faces.append([vertex_count+0, vertex_count+3, vertex_count+7])
+        all_faces.append([vertex_count+0, vertex_count+7, vertex_count+4])
+        
+        vertex_count += 8
     
-    # Filter out vertices that are not in the mask
-    mask_flat = mask.flatten()
-    active_indices = np.where(mask_flat)[0]
-    
-    if len(active_indices) == 0:
-        print("Warning: No pixels found in mask. Check if the SVG has proper black fills.")
-        return None, None
-    
-    # Create a mapping from original indices to filtered vertex indices
-    index_map = np.zeros(width * height, dtype=int) - 1
-    index_map[active_indices] = np.arange(len(active_indices))
-    
-    # Filter vertices
-    bottom_active = bottom_vertices[active_indices]
-    top_active = top_vertices[active_indices]
-    
-    # Combine all vertices
-    vertices = np.vstack((bottom_active, top_active))
-    
-    # Number of vertices per layer
-    n_active = len(active_indices)
-    
-    # Create faces
-    faces = []
-    
-    # Function to check if a point is in the mask and has a valid index
-    def is_valid(x, y):
-        if 0 <= x < width and 0 <= y < height:
-            index = y * width + x
-            return mask_flat[index] and index_map[index] >= 0
-        return False
-    
-    # Progress indicator
-    print(f"Creating mesh with {n_active} active vertices...")
-    print("Creating top and bottom faces...")
-    
-    # Create top and bottom faces for each active pixel
-    for i in tqdm(range(height - 1)):
-        for j in range(width - 1):
-            # Check if current pixel is in the mask
-            if not mask[i, j]:
-                continue
-                
-            # Get indices of the four corners of this pixel
-            idx00 = i * width + j
-            idx01 = i * width + (j + 1)
-            idx10 = (i + 1) * width + j
-            idx11 = (i + 1) * width + (j + 1)
-            
-            # Check if neighbors are also in the mask
-            has_right = mask[i, j + 1] if j + 1 < width else False
-            has_bottom = mask[i + 1, j] if i + 1 < height else False
-            has_diagonal = mask[i + 1, j + 1] if (i + 1 < height and j + 1 < width) else False
-            
-            # Create bottom face triangles
-            if has_right and has_bottom and has_diagonal:
-                # Get the mapped indices
-                m00 = index_map[idx00]
-                m01 = index_map[idx01]
-                m10 = index_map[idx10]
-                m11 = index_map[idx11]
-                
-                # Create two triangles for the bottom face
-                faces.append([m00, m01, m11])
-                faces.append([m00, m11, m10])
-                
-                # Create two triangles for the top face
-                faces.append([m00 + n_active, m11 + n_active, m01 + n_active])
-                faces.append([m00 + n_active, m10 + n_active, m11 + n_active])
-    
-    print("Creating side faces...")
-    
-    # Create side faces along the edges of the model
-    for y in tqdm(range(height)):
-        for x in range(width):
-            if not mask[y, x]:
-                continue
-                
-            idx = y * width + x
-            m_idx = index_map[idx]
-            
-            # Check each of the four sides and add faces if it's an edge
-            # Right edge
-            if x == width - 1 or not mask[y, x + 1]:
-                if x < width - 1 and y < height - 1 and mask[y + 1, x]:
-                    right_bottom_idx = index_map[(y + 1) * width + x]
-                    faces.append([m_idx, m_idx + n_active, right_bottom_idx + n_active])
-                    faces.append([m_idx, right_bottom_idx + n_active, right_bottom_idx])
-            
-            # Left edge
-            if x == 0 or not mask[y, x - 1]:
-                if x > 0 and y < height - 1 and mask[y + 1, x]:
-                    left_bottom_idx = index_map[(y + 1) * width + x]
-                    faces.append([m_idx, left_bottom_idx, m_idx + n_active])
-                    faces.append([left_bottom_idx, left_bottom_idx + n_active, m_idx + n_active])
-            
-            # Top edge
-            if y == 0 or not mask[y - 1, x]:
-                if y > 0 and x < width - 1 and mask[y, x + 1]:
-                    top_right_idx = index_map[y * width + (x + 1)]
-                    faces.append([m_idx, top_right_idx, m_idx + n_active])
-                    faces.append([top_right_idx, top_right_idx + n_active, m_idx + n_active])
-            
-            # Bottom edge
-            if y == height - 1 or not mask[y + 1, x]:
-                if y < height - 1 and x < width - 1 and mask[y, x + 1]:
-                    bottom_right_idx = index_map[y * width + (x + 1)]
-                    faces.append([m_idx, m_idx + n_active, bottom_right_idx])
-                    faces.append([m_idx + n_active, bottom_right_idx + n_active, bottom_right_idx])
-    
-    return vertices, np.array(faces)
+    # Преобразуем списки в numpy массивы
+    return np.array(all_vertices), np.array(all_faces)
 
 def parse_svg_viewbox(svg_file):
     """
@@ -354,11 +424,11 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug
     real_height = height * pixel_size
     print(f"Real dimensions: {real_width:.2f}mm x {real_height:.2f}mm x {thickness:.2f}mm")
     
-    # Create 3D model
-    print("Generating 3D model...")
-    vertices, faces = create_heightmap_mesh(mask, thickness, pixel_size)
+    # Create 3D model with optimization
+    print("Generating optimized 3D model...")
+    vertices, faces = create_optimized_mesh(mask, thickness, pixel_size)
     
-    if vertices is None or len(faces) == 0:
+    if vertices is None or len(faces) == 0 or len(vertices) == 0:
         print("Error: Failed to generate mesh. Check if the SVG contains valid black fill areas.")
         if os.path.exists(temp_png) and not debug:
             os.remove(temp_png)
