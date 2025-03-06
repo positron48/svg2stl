@@ -15,19 +15,17 @@ from stl import mesh
 import time
 from tqdm import tqdm
 
-def downsample_image(img, max_size=1000):
-    """Downsample image if it's too large."""
-    width, height = img.size
+def calculate_dpi(pixel_size):
+    """
+    Расчет DPI на основе размера пикселя в мм.
     
-    # Calculate scaling factor to keep aspect ratio
-    if width > max_size or height > max_size:
-        scale = min(max_size / width, max_size / height)
-        new_width = int(width * scale)
-        new_height = int(height * scale)
-        print(f"Downsampling image from {width}x{height} to {new_width}x{new_height}")
-        return img.resize((new_width, new_height), Image.LANCZOS)
+    Эмпирическая формула на основе примеров:
+    pixel_size=0.05, dpi=600
+    pixel_size=0.1, dpi=300
     
-    return img
+    Получается соотношение: pixel_size * dpi = 30
+    """
+    return int(30 / pixel_size)
 
 def crop_to_content(img, threshold=240, debug=False):
     """
@@ -53,10 +51,6 @@ def crop_to_content(img, threshold=240, debug=False):
     
     # Create binary mask: True for content, False for background
     mask = img_array < threshold  # PCB content is black (low values)
-    
-    if debug:
-        mask_img = Image.fromarray((mask * 255).astype(np.uint8))
-        mask_img.save("debug_mask.png")
     
     # Find the bounding box of content
     # Get rows and columns with content
@@ -255,7 +249,7 @@ def parse_svg_viewbox(svg_file):
     
     return None
 
-def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=300, max_image_size=1000, debug=False):
+def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug=False):
     """
     Convert an SVG file to an STL 3D model.
     
@@ -264,8 +258,6 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=3
         output_file (str, optional): Path to the output STL file. If None, derived from the SVG filename.
         thickness (float): Thickness of the resulting 3D model in mm
         pixel_size (float): Size of each pixel in mm
-        dpi (int): DPI for rasterization of the SVG
-        max_image_size (int): Maximum size for image processing in pixels
         debug (bool): Whether to save debug images
     
     Returns:
@@ -273,6 +265,10 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=3
     """
     start_time = time.time()
     print(f"Converting {svg_file} to STL...")
+    
+    # Рассчитываем DPI на основе размера пикселя
+    dpi = calculate_dpi(pixel_size)
+    print(f"Using pixel size {pixel_size}mm (calculated DPI: {dpi})")
     
     # If output_file is not specified, derive it from the input filename
     if output_file is None:
@@ -286,7 +282,7 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=3
     # Create a temporary PNG file
     temp_png = "temp.png"
     
-    # Convert SVG to PNG with high resolution
+    # Convert SVG to PNG with calculated resolution
     print(f"Rasterizing SVG at {dpi} DPI...")
     
     # Use cairosvg with specific parameters to preserve transparency
@@ -316,10 +312,6 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=3
     # Convert back to PIL Image
     mask_img = Image.fromarray(black_mask)
     
-    if debug:
-        img.save("debug_original_color.png")
-        mask_img.save("debug_black_mask.png")
-    
     width, height = mask_img.size
     print(f"Original image dimensions: {width}x{height} pixels")
     
@@ -344,19 +336,16 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, dpi=3
         print(f"Cropping image from {mask_img.size} to {bbox[2]-bbox[0]}x{bbox[3]-bbox[1]}")
         cropped_mask = mask_img.crop(bbox)
     
+    # Сохраняем только обрезанное изображение, если требуется отладка
     if debug:
-        cropped_mask.save("debug_cropped_mask.png")
+        cropped_mask.save("debug_cropped.png")
     
-    # Downsample image if too large
-    scaled_mask = downsample_image(cropped_mask, max_size=max_image_size)
-    width, height = scaled_mask.size
+    # Используем обрезанное изображение без дальнейшего масштабирования
+    width, height = cropped_mask.size
     print(f"Processing image dimensions: {width}x{height} pixels")
     
-    if debug:
-        scaled_mask.save("debug_downsampled_mask.png")
-    
     # Create binary mask: True where image has content (white in our mask)
-    img_array = np.array(scaled_mask)
+    img_array = np.array(cropped_mask)
     # Convert values > 127 to True, <= 127 to False
     mask = img_array > 127
     
@@ -410,8 +399,6 @@ def main():
     # Optional parameters
     parser.add_argument('--thickness', type=float, default=1.0, help='Thickness of the resulting 3D model in mm (default: 1.0)')
     parser.add_argument('--pixel_size', type=float, default=0.05, help='Size of each pixel in mm (default: 0.05)')
-    parser.add_argument('--dpi', type=int, default=300, help='DPI for rasterization of the SVG (default: 300)')
-    parser.add_argument('--max_size', type=int, default=1000, help='Maximum image size in pixels (default: 1000)')
     parser.add_argument('--debug', action='store_true', help='Save debug images and keep temporary files')
     
     args = parser.parse_args()
@@ -429,8 +416,6 @@ def main():
                 str(svg_file),
                 thickness=args.thickness,
                 pixel_size=args.pixel_size,
-                dpi=args.dpi,
-                max_image_size=args.max_size,
                 debug=args.debug
             )
     else:
@@ -443,8 +428,6 @@ def main():
             args.svg_file,
             thickness=args.thickness,
             pixel_size=args.pixel_size,
-            dpi=args.dpi,
-            max_image_size=args.max_size,
             debug=args.debug
         )
 
