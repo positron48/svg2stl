@@ -135,19 +135,20 @@ jobs:
 
     - name: Сборка с PyInstaller для Windows
       if: matrix.os == 'windows-latest'
+      shell: cmd
       run: |
-        # Используем улучшенные параметры сборки для Windows
-        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} \
-          --version-file=version_info.txt \
-          --manifest=uac_manifest.xml \
-          --hidden-import=PIL._tkinter_finder \
-          --exclude-module=tcl \
-          --exclude-module=tk \
-          --exclude-module=Tkinter \
-          --exclude-module=_tkinter \
-          --noupx \
-          --win-private-assemblies \
-          --uac-admin \
+        :: Используем улучшенные параметры сборки для Windows
+        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
+          --version-file=version_info.txt ^
+          --manifest=uac_manifest.xml ^
+          --hidden-import=PIL._tkinter_finder ^
+          --exclude-module=tcl ^
+          --exclude-module=tk ^
+          --exclude-module=Tkinter ^
+          --exclude-module=_tkinter ^
+          --noupx ^
+          --win-private-assemblies ^
+          --uac-admin ^
           svg2stl.py
 
     - name: Загрузить артефакты сборки
