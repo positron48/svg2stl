@@ -22,6 +22,8 @@ After downloading:
 - **Windows**: Simply double-click the exe file
 - **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
 
+> **Note for Linux users**: The binaries are compiled on older Linux systems (Ubuntu 20.04) for maximum compatibility with most distributions. If you still encounter errors, please use the source code method below.
+
 ### Option 2: Run from Source Code
 
 Requires Python 3.7 or higher and the following packages:
@@ -103,14 +105,37 @@ The formula used is: `DPI = 30 / pixel_size`
 
 ## Building from Source
 
-To create your own binary file from the source code, you can use PyInstaller:
+To create your own binary file from the source code with maximum compatibility:
 
+### Linux (for maximum compatibility)
+```
+# Using an older distribution is recommended (e.g., Ubuntu 18.04 or 20.04)
+pip install pyinstaller
+pyinstaller --onefile --clean --name svg2stl \
+  --hidden-import=PIL._tkinter_finder \
+  --exclude-module=tcl \
+  --exclude-module=tk \
+  --exclude-module=Tkinter \
+  --exclude-module=_tkinter \
+  svg2stl.py
+```
+
+### Windows and macOS
 ```
 pip install pyinstaller
 pyinstaller --onefile svg2stl.py
 ```
 
 The executable file will be created in the `dist/` folder.
+
+## Troubleshooting
+
+### Linux Compatibility Issues
+
+If you encounter errors like `GLIBC_2.xx not found`, it means the binary was built with a newer version of Linux libraries than what's available on your system. Use one of these solutions:
+
+1. Run the script directly with Python (Option 2)
+2. Build your own binary with PyInstaller on your system using the instructions above
 
 ## License
 

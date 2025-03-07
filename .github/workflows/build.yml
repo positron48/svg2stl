@@ -12,9 +12,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04  # Используем более старую версию Ubuntu для максимальной совместимости
             artifact_name: svg2stl-linux
             asset_name: svg2stl-linux
           - os: windows-latest
@@ -31,7 +30,7 @@ jobs:
     - name: Настройка Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.8'  # Используем Python 3.8 для лучшей совместимости
         cache: 'pip'
 
     - name: Установка зависимостей
@@ -40,12 +39,24 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Сборка с PyInstaller (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Сборка с PyInstaller для Linux
+      if: matrix.os == 'ubuntu-20.04'
+      run: |
+        # Используем специальные опции для создания максимально портативного бинарника
+        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} \
+          --hidden-import=PIL._tkinter_finder \
+          --exclude-module=tcl \
+          --exclude-module=tk \
+          --exclude-module=Tkinter \
+          --exclude-module=_tkinter \
+          svg2stl.py
+
+    - name: Сборка с PyInstaller для macOS
+      if: matrix.os == 'macos-latest'
       run: |
         pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
 
-    - name: Сборка с PyInstaller (Windows)
+    - name: Сборка с PyInstaller для Windows
       if: matrix.os == 'windows-latest'
       run: |
         pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
