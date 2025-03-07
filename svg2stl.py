@@ -319,7 +319,7 @@ def parse_svg_viewbox(svg_file):
     
     return None
 
-def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug=False):
+def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug=False, inverted=False):
     """
     Convert an SVG file to an STL 3D model.
     
@@ -329,6 +329,7 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug
         thickness (float): Thickness of the resulting 3D model in mm
         pixel_size (float): Size of each pixel in mm
         debug (bool): Whether to save debug images
+        inverted (bool): If True, extracts white pixels instead of black
     
     Returns:
         str: Path to the generated STL file
@@ -355,32 +356,52 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug
     # Convert SVG to PNG with calculated resolution
     print(f"Rasterizing SVG at {dpi} DPI...")
     
-    # Use cairosvg with specific parameters to preserve transparency
+    # Use cairosvg to preserve transparency
     cairosvg.svg2png(
         url=svg_file,
         write_to=temp_png,
         dpi=dpi,
-        background_color="white",  # Set background to white
+        # Не указываем background_color, чтобы сохранить прозрачность
         scale=1.0
     )
     
-    # Load the PNG image and convert to grayscale
+    # Load the PNG image with alpha channel
     print("Creating binary mask...")
-    img = Image.open(temp_png).convert('RGB')  # Convert to RGB first
+    img = Image.open(temp_png).convert('RGBA')  # Используем RGBA вместо RGB для сохранения прозрачности
     
-    # Extract only the black parts (PCB traces in KiCad)
-    # For KiCad, the PCB traces are black, and we want to turn them into 3D
-    r, g, b = img.split()
+    # Extract color channels plus alpha
+    r, g, b, a = img.split()
     
-    # Check all channels - black pixels have low values in all channels
-    # Create a binary mask where black parts are white (255) and everything else is black (0)
-    threshold = 50  # Adjust if needed
-    black_mask = np.where((np.array(r) < threshold) & 
-                          (np.array(g) < threshold) & 
-                          (np.array(b) < threshold), 255, 0).astype(np.uint8)
+    # Threshold for color detection
+    threshold = 50
+
+    if inverted:
+        # For inverted mode - extract WHITE parts (high values in all channels)
+        # но учитываем только непрозрачные пиксели!
+        print("Extracting WHITE pixels (inverted mode)...")
+        pixel_mask = np.where(
+            (np.array(r) > 255 - threshold) & 
+            (np.array(g) > 255 - threshold) & 
+            (np.array(b) > 255 - threshold) &
+            (np.array(a) > 200),  # Только непрозрачные пиксели
+            255, 0).astype(np.uint8)
+    else:
+        # Normal mode - extract BLACK parts (low values in all channels)
+        # но учитываем только непрозрачные пиксели!
+        print("Extracting BLACK pixels (normal mode)...")
+        pixel_mask = np.where(
+            (np.array(r) < threshold) & 
+            (np.array(g) < threshold) & 
+            (np.array(b) < threshold) &
+            (np.array(a) > 200),  # Только непрозрачные пиксели
+            255, 0).astype(np.uint8)
     
     # Convert back to PIL Image
-    mask_img = Image.fromarray(black_mask)
+    mask_img = Image.fromarray(pixel_mask)
+    
+    # Сохраняем оригинальную маску для отладки, если требуется
+    if debug:
+        mask_img.save("debug_original_mask.png")
     
     width, height = mask_img.size
     print(f"Original image dimensions: {width}x{height} pixels")
@@ -390,7 +411,8 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug
     bbox = mask_img.getbbox()
     
     if bbox is None:
-        print("Warning: No black content found in the image. The SVG might not contain black fills.")
+        color_type = "white" if inverted else "black"
+        print(f"Warning: No {color_type} content found in the image. The SVG might not contain {color_type} fills.")
         # Use the whole image as fallback
         cropped_mask = mask_img
     else:
@@ -470,6 +492,7 @@ def main():
     parser.add_argument('--thickness', type=float, default=1.0, help='Thickness of the resulting 3D model in mm (default: 1.0)')
     parser.add_argument('--pixel_size', type=float, default=0.05, help='Size of each pixel in mm (default: 0.05)')
     parser.add_argument('--debug', action='store_true', help='Save debug images and keep temporary files')
+    parser.add_argument('--inverted', action='store_true', help='Extract white pixels instead of black')
     
     args = parser.parse_args()
     
@@ -486,19 +509,17 @@ def main():
                 str(svg_file),
                 thickness=args.thickness,
                 pixel_size=args.pixel_size,
-                debug=args.debug
+                debug=args.debug,
+                inverted=args.inverted
             )
     else:
-        # Process a single SVG file
-        if not os.path.exists(args.svg_file):
-            print(f"Error: File '{args.svg_file}' not found.")
-            sys.exit(1)
-        
+        # Process single file
         svg_to_stl(
             args.svg_file,
             thickness=args.thickness,
             pixel_size=args.pixel_size,
-            debug=args.debug
+            debug=args.debug,
+            inverted=args.inverted
         )
 
 if __name__ == "__main__":

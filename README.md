@@ -60,8 +60,9 @@ python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
 
 - `--thickness`: Thickness of the resulting 3D model in mm (default: 1.0)
 - `--pixel_size`: Size of each pixel in mm (default: 0.05). Determines rasterization resolution and model detail
-- `--debug`: Save cropped image for checking
+- `--debug`: Save debug images for checking
 - `--all`: Process all SVG files in the current directory
+- `--inverted`: Extract white pixels instead of black (useful for negative images or light-on-dark designs)
 
 ## Examples
 
@@ -78,6 +79,11 @@ svg2stl --all --thickness 1.0 --pixel_size 0.05
 Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (600 DPI):
 ```
 svg2stl board-F_Cu.svg --thickness 0.8 --pixel_size 0.05
+```
+
+Process white elements from SVG instead of black (for negative/inverted designs):
+```
+svg2stl negative-design.svg --thickness 1.0 --pixel_size 0.05 --inverted
 ```
 
 Process all SVG files with very high resolution (1200 DPI):
