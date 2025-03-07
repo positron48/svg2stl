@@ -96,8 +96,13 @@ jobs:
           --include-package=PIL ^
           --include-package=stl ^
           --include-package=tqdm ^
-          --windows-disable-console ^
+          --windows-console-mode=disable ^
           --output-filename=${{ matrix.artifact_name }} ^
+          --plugin-enable=anti-bloat ^
+          --noinclude-unittest-mode=nofollow ^
+          --noinclude-setuptools-mode=nofollow ^
+          --noinclude-doctest-mode=nofollow ^
+          --remove-output ^
           svg2stl.py
         
         :: Перемещаем исполняемый файл в dist
