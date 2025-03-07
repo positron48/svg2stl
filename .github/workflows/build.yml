@@ -96,7 +96,6 @@ jobs:
           --include-package=PIL ^
           --include-package=stl ^
           --include-package=tqdm ^
-          --windows-icon-from-ico=NONE ^
           --windows-disable-console ^
           --output-filename=${{ matrix.artifact_name }} ^
           svg2stl.py
