@@ -39,81 +39,27 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    # Дополнительная установка Nuitka для Windows
+    - name: Установка Nuitka для Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        pip install nuitka
+        pip install ordered-set zstandard
+
     - name: Создание файлов метаданных для Windows
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
-        # Создание файла версии
+        # Создание файла версии для встраивания в Windows PE
         cat > version_info.txt << EOF
-        # UTF-8
-        #
-        # For more details about fixed file info 'ffi' see:
-        # http://msdn.microsoft.com/en-us/library/ms646997.aspx
-        VSVersionInfo(
-          ffi=FixedFileInfo(
-            # filevers и prodvers должны быть всегда кортежами из 4-х 16-битных чисел
-            filevers=(1, 0, 0, 0),
-            prodvers=(1, 0, 0, 0),
-            # Содержит флаг маски для файла
-            mask=0x3f,
-            # Содержит флаг, определяющий тип файла
-            flags=0x0,
-            # ОС, для которой предназначен этот файл
-            OS=0x40004,
-            # Тип файла
-            fileType=0x1,
-            # Подтип файла
-            subtype=0x0,
-            # Дата создания
-            date=(0, 0)
-          ),
-          kids=[
-            StringFileInfo(
-              [
-              StringTable(
-                '040904B0',
-                [StringStruct('CompanyName', 'SVG to STL Converter'),
-                StringStruct('FileDescription', 'SVG to STL Converter Tool'),
-                StringStruct('FileVersion', '1.0.0'),
-                StringStruct('InternalName', 'svg2stl'),
-                StringStruct('LegalCopyright', 'MIT License'),
-                StringStruct('OriginalFilename', 'svg2stl.exe'),
-                StringStruct('ProductName', 'SVG to STL Converter'),
-                StringStruct('ProductVersion', '1.0.0')])
-              ]),
-            VarFileInfo([VarStruct('Translation', [1033, 1200])])
-          ]
-        )
-        EOF
-
-        # Создание файла манифеста Windows
-        cat > uac_manifest.xml << EOF
-        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-        <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-          <assemblyIdentity version="1.0.0.0" processorArchitecture="*" name="svg2stl" type="win32"/>
-          <description>SVG to STL Converter Tool</description>
-          <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
-            <security>
-              <requestedPrivileges>
-                <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
-              </requestedPrivileges>
-            </security>
-          </trustInfo>
-          <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
-            <application>
-              <!-- Windows 10 и Windows Server 2016 -->
-              <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-              <!-- Windows 8.1 и Windows Server 2012 R2 -->
-              <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
-              <!-- Windows 8 и Windows Server 2012 -->
-              <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
-              <!-- Windows 7 и Windows Server 2008 R2 -->
-              <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
-              <!-- Windows Vista и Windows Server 2008 -->
-              <supportedOS Id="{e2011457-1546-43c5-a5fe-008deee3d3f0}"/>
-            </application>
-          </compatibility>
-        </assembly>
+        CompanyName: SVG to STL Converter
+        FileDescription: SVG to STL Converter Tool
+        FileVersion: 1.0.0
+        InternalName: svg2stl
+        LegalCopyright: MIT License
+        OriginalFilename: svg2stl.exe
+        ProductName: SVG to STL Converter
+        ProductVersion: 1.0.0
         EOF
 
     - name: Сборка с PyInstaller для Linux
@@ -133,22 +79,31 @@ jobs:
       run: |
         pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
 
-    - name: Сборка с PyInstaller для Windows
+    - name: Сборка с Nuitka для Windows
       if: matrix.os == 'windows-latest'
       shell: cmd
       run: |
-        :: Используем улучшенные параметры сборки для Windows
-        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
-          --version-file=version_info.txt ^
-          --manifest=uac_manifest.xml ^
-          --hidden-import=PIL._tkinter_finder ^
-          --exclude-module=tcl ^
-          --exclude-module=tk ^
-          --exclude-module=Tkinter ^
-          --exclude-module=_tkinter ^
-          --noupx ^
-          --uac-admin ^
+        :: Используем Nuitka вместо PyInstaller для сборки Windows
+        python -m nuitka --mingw64 --standalone --onefile --assume-yes-for-downloads ^
+          --company-name="SVG to STL Converter" ^
+          --product-name="SVG to STL Converter" ^
+          --file-version="1.0.0" ^
+          --product-version="1.0.0" ^
+          --file-description="SVG to STL Converter Tool" ^
+          --copyright="MIT License" ^
+          --include-package=numpy ^
+          --include-package=cairosvg ^
+          --include-package=PIL ^
+          --include-package=stl ^
+          --include-package=tqdm ^
+          --windows-icon-from-ico=NONE ^
+          --windows-disable-console ^
+          --output-filename=${{ matrix.artifact_name }} ^
           svg2stl.py
+        
+        :: Перемещаем исполняемый файл в dist
+        mkdir dist
+        move ${{ matrix.artifact_name }} dist\
 
     - name: Загрузить артефакты сборки
       uses: actions/upload-artifact@v4
