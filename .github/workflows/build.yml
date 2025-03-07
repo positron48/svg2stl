@@ -147,7 +147,6 @@ jobs:
           --exclude-module=Tkinter ^
           --exclude-module=_tkinter ^
           --noupx ^
-          --win-private-assemblies ^
           --uac-admin ^
           svg2stl.py
 
