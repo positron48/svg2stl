@@ -22,6 +22,10 @@ After downloading:
 - **Windows**: Simply double-click the exe file
 - **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
 
+> **Note for Windows users**: Some antivirus software, including Windows Defender, may falsely flag the executable as malicious. This is a common issue with Python applications compiled into standalone executables. The application is safe to use, but if you're concerned, you have these options:
+> 1. Add an exception in your antivirus for the svg2stl-windows.exe file
+> 2. Run the script directly from source code (see Option 2 below)
+
 > **Note for Linux users**: The binaries are compiled on older Linux systems (Ubuntu 20.04) for maximum compatibility with most distributions. If you still encounter errors, please use the source code method below.
 
 ### Option 2: Run from Source Code
@@ -44,6 +48,19 @@ Run:
 ```
 python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
 ```
+
+## Adding an Exception in Windows Defender
+
+If Windows Defender blocks the application, you can add an exception:
+
+1. Open **Windows Security** (search for it in the Start menu)
+2. Click on **Virus & threat protection**
+3. Under "Virus & threat protection settings", click **Manage settings**
+4. Scroll down to **Exclusions** and click **Add or remove exclusions**
+5. Click **Add an exclusion** and select **File**
+6. Browse to and select the svg2stl-windows.exe file
+
+This will allow the application to run normally on your system.
 
 ## Features
 

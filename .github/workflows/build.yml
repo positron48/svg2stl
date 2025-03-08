@@ -98,8 +98,6 @@ jobs:
           --include-package=tqdm ^
           --windows-console-mode=disable ^
           --output-filename=${{ matrix.artifact_name }} ^
-          --plugin-enable=anti-bloat ^
-          --nofollow-imports ^
           --nofollow-import-to=unittest ^
           --nofollow-import-to=doctest ^
           --nofollow-import-to=setuptools ^

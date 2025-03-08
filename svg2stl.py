@@ -19,16 +19,7 @@ from tqdm import tqdm
 MM_PER_INCH = 25.4  # 1 дюйм = 25.4 мм
 
 def calculate_dpi(pixel_size):
-    """
-    Расчет DPI на основе размера пикселя в мм.
-    
-    Эмпирическая формула на основе примеров:
-    pixel_size=0.05, dpi=600
-    pixel_size=0.1, dpi=300
-    
-    Получается соотношение: pixel_size * dpi = 30
-    """
-    return int(30 / pixel_size)
+    return int(MM_PER_INCH / pixel_size)
 
 def crop_to_content(img, threshold=240, debug=False):
     """
