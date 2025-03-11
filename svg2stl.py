@@ -470,32 +470,37 @@ def svg_to_stl(svg_file, output_file=None, thickness=1.0, pixel_size=0.05, debug
     return output_file
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Convert SVG files to STL 3D models for photopolymer printing.'
-    )
+    """
+    Main function to parse arguments and process files.
+    """
+    parser = argparse.ArgumentParser(description='Convert SVG files to STL 3D models.')
     
-    # Input file or --all flag
-    input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument('svg_file', nargs='?', help='Input SVG file')
-    input_group.add_argument('--all', action='store_true', help='Convert all SVG files in the current directory')
+    # Required args (now with default behavior)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('svg_file', nargs='?', help='Input SVG file')
+    group.add_argument('--all', action='store_true', help='Process all SVG files in current directory')
     
-    # Optional parameters
-    parser.add_argument('--thickness', type=float, default=1.0, help='Thickness of the resulting 3D model in mm (default: 1.0)')
-    parser.add_argument('--pixel_size', type=float, default=0.025, help='Size of each pixel in mm (default: 0.025)')
-    parser.add_argument('--debug', action='store_true', help='Save debug images and keep temporary files')
+    # Optional args
+    parser.add_argument('--output', help='Output STL file (optional)')
+    parser.add_argument('--thickness', type=float, default=1.0, help='Thickness in mm (default: 1.0)')
+    parser.add_argument('--pixel_size', type=float, default=0.025, help='Pixel size in mm (default: 0.025)')
+    parser.add_argument('--debug', action='store_true', help='Save debug images')
     parser.add_argument('--inverted', action='store_true', help='Extract white pixels instead of black')
     
     args = parser.parse_args()
     
+    # If neither svg_file nor --all are specified, default to --all
+    if args.svg_file is None and not args.all:
+        args.all = True
+        print("No file specified, defaulting to processing all SVG files in the current directory.")
+    
     if args.all:
-        # Process all SVG files in the current directory
+        # Process all SVG files in current directory
         svg_files = list(Path('.').glob('*.svg'))
-        if not svg_files:
-            print("No SVG files found in the current directory.")
-            sys.exit(1)
-        
         print(f"Found {len(svg_files)} SVG files.")
+        
         for svg_file in svg_files:
+            print(f"\nProcessing {svg_file}...")
             svg_to_stl(
                 str(svg_file),
                 thickness=args.thickness,
@@ -504,14 +509,18 @@ def main():
                 inverted=args.inverted
             )
     else:
-        # Process single file
-        svg_to_stl(
+        # Process a single file
+        result = svg_to_stl(
             args.svg_file,
-            thickness=args.thickness,
-            pixel_size=args.pixel_size,
-            debug=args.debug,
-            inverted=args.inverted
+            args.output,
+            args.thickness,
+            args.pixel_size,
+            args.debug,
+            args.inverted
         )
+        
+        if not result:
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()

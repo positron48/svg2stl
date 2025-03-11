@@ -10,16 +10,11 @@ import sys
 def main():
     # Создаем директорию cairosvg
     os.makedirs('cairosvg', exist_ok=True)
+    print(f"Created directory: {os.path.abspath('cairosvg')}")
 
-    # Создаем файлы для модуля-заглушки
-    with open('cairosvg/__init__.py', 'w') as f:
-        f.write('from . import surface\n')
-
-    with open('cairosvg/surface.py', 'w') as f:
-        f.write('from .compat import svg2png\n')
-
-    # Создаем файл с реализацией
-    compat_code = '''import os
+    # Создаем реализацию функции svg2png
+    svg2png_code = '''
+import os
 from pathlib import Path
 import io
 from PIL import Image
@@ -28,7 +23,7 @@ from reportlab.graphics import renderPM
 
 def svg2png(url=None, file_obj=None, dpi=96, output_width=None, output_height=None, **kwargs):
     """
-    Convert SVG to PNG using pycairo and svglib.
+    Convert SVG to PNG using svglib and reportlab.
     Compatible with cairosvg.svg2png signature.
     """
     # Determine input source
@@ -80,10 +75,21 @@ def svg2png(url=None, file_obj=None, dpi=96, output_width=None, output_height=No
         with open(output_path, "wb") as f:
             f.write(png_data)
     else:
-        return png_data'''
+        return png_data
+'''
 
+    # Создаем файлы для модуля
+    with open('cairosvg/__init__.py', 'w') as f:
+        # Важно: экспортируем svg2png напрямую из модуля cairosvg
+        f.write('from .compat import svg2png\nfrom . import surface\n')
+
+    # Создаем файл surface.py 
+    with open('cairosvg/surface.py', 'w') as f:
+        f.write('from .compat import svg2png\n')
+
+    # Создаем файл с реализацией
     with open('cairosvg/compat.py', 'w') as f:
-        f.write(compat_code)
+        f.write(svg2png_code)
 
     print('CairoSVG adapter module created successfully')
 
@@ -91,17 +97,26 @@ def svg2png(url=None, file_obj=None, dpi=96, output_width=None, output_height=No
     current_dir = os.getcwd()
     if current_dir not in sys.path:
         sys.path.insert(0, current_dir)
+    print(f"Added to sys.path: {current_dir}")
+
+    # Проверяем созданные файлы
+    print("Listing created files:")
+    for root, dirs, files in os.walk('cairosvg'):
+        for file in files:
+            print(f"  {os.path.join(root, file)}")
 
     # Проверяем, что модуль создан и работает
     try:
+        print("Attempting to import cairosvg...")
         import cairosvg
-        print('CairoSVG imported successfully')
+        # Проверяем, что функция svg2png доступна напрямую
+        if hasattr(cairosvg, 'svg2png'):
+            print('CairoSVG adapter ready: svg2png function available')
+        else:
+            print(f'ERROR: svg2png function not found in the cairosvg module! Available attributes: {dir(cairosvg)}')
     except ImportError as e:
-        # Если импорт не удался, выводим предупреждение, но не прерываем процесс
         print(f'Warning: Could not import cairosvg module: {e}')
         print('This may not be a problem if the module will be imported from a different context.')
-        # Не выходим с ошибкой, так как файлы уже созданы
-        return 0
     
     return 0
 
