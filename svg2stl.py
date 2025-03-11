@@ -481,7 +481,7 @@ def main():
     
     # Optional parameters
     parser.add_argument('--thickness', type=float, default=1.0, help='Thickness of the resulting 3D model in mm (default: 1.0)')
-    parser.add_argument('--pixel_size', type=float, default=0.05, help='Size of each pixel in mm (default: 0.05)')
+    parser.add_argument('--pixel_size', type=float, default=0.025, help='Size of each pixel in mm (default: 0.025)')
     parser.add_argument('--debug', action='store_true', help='Save debug images and keep temporary files')
     parser.add_argument('--inverted', action='store_true', help='Extract white pixels instead of black')
     

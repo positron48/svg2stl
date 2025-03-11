@@ -19,7 +19,9 @@ Download a ready-to-use executable for your operating system from the [releases 
 - **Linux**: svg2stl-linux
 
 After downloading:
-- **Windows**: Simply double-click the exe file
+- **Windows**:
+  - **Method 1**: Place the .exe file in the same folder as your SVG files and double-click to run it. It will process any SVG file in the same directory.
+  - **Method 2**: Run from Command Prompt or PowerShell to use command-line parameters: `svg2stl-windows.exe input.svg --thickness 1.0`
 - **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
 
 > **Note for Windows users**: Some antivirus software, including Windows Defender, may falsely flag the executable as malicious. This is a common issue with Python applications compiled into standalone executables. The application is safe to use, but if you're concerned, you have these options:
@@ -46,7 +48,7 @@ pip install -r requirements.txt
 
 Run:
 ```
-python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
+python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.025
 ```
 
 ## Adding an Exception in Windows Defender
@@ -76,7 +78,7 @@ This will allow the application to run normally on your system.
 ## Command Line Arguments
 
 - `--thickness`: Thickness of the resulting 3D model in mm (default: 1.0)
-- `--pixel_size`: Size of each pixel in mm (default: 0.05). Determines rasterization resolution and model detail
+- `--pixel_size`: Size of each pixel in mm (default: 0.025). Determines rasterization resolution and model detail
 - `--debug`: Save debug images for checking
 - `--all`: Process all SVG files in the current directory
 - `--inverted`: Extract white pixels instead of black (useful for negative images or light-on-dark designs)
@@ -85,27 +87,27 @@ This will allow the application to run normally on your system.
 
 Convert a single SVG file:
 ```
-svg2stl input.svg --thickness 1.0 --pixel_size 0.05
+svg2stl input.svg --thickness 1.0
 ```
 
 Convert all SVG files in the current directory:
 ```
-svg2stl --all --thickness 1.0 --pixel_size 0.05
+svg2stl --all --thickness 1.0
 ```
 
-Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (600 DPI):
+Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (1200 DPI):
 ```
-svg2stl board-F_Cu.svg --thickness 0.8 --pixel_size 0.05
+svg2stl board-F_Cu.svg --thickness 0.8
 ```
 
 Process white elements from SVG instead of black (for negative/inverted designs):
 ```
-svg2stl negative-design.svg --thickness 1.0 --pixel_size 0.05 --inverted
+svg2stl negative-design.svg --thickness 1.0 --inverted
 ```
 
-Process all SVG files with very high resolution (1200 DPI):
+Process with medium resolution (600 DPI) for faster processing:
 ```
-svg2stl --all --thickness 1.0 --pixel_size 0.025
+svg2stl --all --thickness 1.0 --pixel_size 0.05
 ```
 
 Quick processing of a large file with lower resolution (300 DPI):
