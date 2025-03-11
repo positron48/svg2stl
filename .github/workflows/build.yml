@@ -33,14 +33,37 @@ jobs:
         python-version: '3.8'  # Используем Python 3.8 для лучшей совместимости
         cache: 'pip'
 
-    # Установка GTK и Cairo для Windows
-    - name: Установка GTK и Cairo для Windows
+    # Установка Cairo для Windows с помощью MSYS2
+    - name: Установка Cairo для Windows (MSYS2)
       if: matrix.os == 'windows-latest'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-cairo
+          mingw-w64-x86_64-pango
+          mingw-w64-x86_64-gtk3
+
+    - name: Копирование DLL из MSYS2 в директорию проекта
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
       run: |
-        curl -LO https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2021-04-29/gtk3-runtime-3.24.29-2021-04-29-ts-win64.exe
-        7z x gtk3-runtime-3.24.29-2021-04-29-ts-win64.exe -ogtk3
-        echo "$PWD/gtk3/bin" >> $GITHUB_PATH
-        dir gtk3\bin
+        mkdir -p $GITHUB_WORKSPACE/dll_deps
+        cp /mingw64/bin/libcairo-2.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libfontconfig-1.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libfreetype-6.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libpng16-16.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/zlib1.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libpixman-1-0.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libexpat-1.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libharfbuzz-0.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libbz2-1.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libintl-8.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libiconv-2.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libgcc_s_seh-1.dll $GITHUB_WORKSPACE/dll_deps/
+        cp /mingw64/bin/libwinpthread-1.dll $GITHUB_WORKSPACE/dll_deps/
+        ls -la $GITHUB_WORKSPACE/dll_deps/
 
     - name: Установка зависимостей
       run: |
@@ -146,9 +169,6 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: cmd
       run: |
-        :: Добавляем путь к GTK/Cairo в PATH для pyinstaller
-        set PATH=%PATH%;%CD%\gtk3\bin
-        
         :: Используем улучшенные параметры сборки для Windows
         pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
           --version-file=version_info.txt ^
@@ -164,13 +184,19 @@ jobs:
           --collect-all cairosvg ^
           --collect-all cairocffi ^
           --collect-data cairo ^
-          --add-binary "%CD%\gtk3\bin\libcairo-2.dll;." ^
-          --add-binary "%CD%\gtk3\bin\libfontconfig-1.dll;." ^
-          --add-binary "%CD%\gtk3\bin\libfreetype-6.dll;." ^
-          --add-binary "%CD%\gtk3\bin\libpng16-16.dll;." ^
-          --add-binary "%CD%\gtk3\bin\zlib1.dll;." ^
-          --add-binary "%CD%\gtk3\bin\libpixman-1-0.dll;." ^
-          --add-binary "%CD%\gtk3\bin\libexpat-1.dll;." ^
+          --add-binary "dll_deps\libcairo-2.dll;." ^
+          --add-binary "dll_deps\libfontconfig-1.dll;." ^
+          --add-binary "dll_deps\libfreetype-6.dll;." ^
+          --add-binary "dll_deps\libpng16-16.dll;." ^
+          --add-binary "dll_deps\zlib1.dll;." ^
+          --add-binary "dll_deps\libpixman-1-0.dll;." ^
+          --add-binary "dll_deps\libexpat-1.dll;." ^
+          --add-binary "dll_deps\libharfbuzz-0.dll;." ^
+          --add-binary "dll_deps\libbz2-1.dll;." ^
+          --add-binary "dll_deps\libintl-8.dll;." ^
+          --add-binary "dll_deps\libiconv-2.dll;." ^
+          --add-binary "dll_deps\libgcc_s_seh-1.dll;." ^
+          --add-binary "dll_deps\libwinpthread-1.dll;." ^
           --noupx ^
           svg2stl.py
 
