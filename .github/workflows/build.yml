@@ -33,43 +33,19 @@ jobs:
         python-version: '3.8'  # Используем Python 3.8 для лучшей совместимости
         cache: 'pip'
 
-    # Установка Cairo для Windows с помощью MSYS2
-    - name: Установка Cairo для Windows (MSYS2)
-      if: matrix.os == 'windows-latest'
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-cairo
-          mingw-w64-x86_64-pango
-          mingw-w64-x86_64-gtk3
-
-    - name: Копирование DLL из MSYS2 в директорию проекта
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
-      run: |
-        mkdir -p $GITHUB_WORKSPACE/dll_deps
-        cp /mingw64/bin/libcairo-2.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libfontconfig-1.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libfreetype-6.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libpng16-16.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/zlib1.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libpixman-1-0.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libexpat-1.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libharfbuzz-0.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libbz2-1.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libintl-8.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libiconv-2.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libgcc_s_seh-1.dll $GITHUB_WORKSPACE/dll_deps/
-        cp /mingw64/bin/libwinpthread-1.dll $GITHUB_WORKSPACE/dll_deps/
-        ls -la $GITHUB_WORKSPACE/dll_deps/
-
-    - name: Установка зависимостей
+    # Установка зависимостей
+    - name: Установка базовых зависимостей
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
+
+    # Установка специальных зависимостей для Windows
+    - name: Установка Cairo для Windows (WeasyPrint GTK+)
+      if: matrix.os == 'windows-latest'
+      run: |
+        pip install weasyprint
+        python -c "from weasyprint.tools.utils import get_gtk_build_path; print(get_gtk_build_path())"
 
     - name: Создание файлов метаданных для Windows
       if: matrix.os == 'windows-latest'
@@ -167,38 +143,70 @@ jobs:
 
     - name: Сборка с PyInstaller для Windows
       if: matrix.os == 'windows-latest'
-      shell: cmd
+      shell: python
       run: |
-        :: Используем улучшенные параметры сборки для Windows
-        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
-          --version-file=version_info.txt ^
-          --manifest=uac_manifest.xml ^
-          --hidden-import=PIL._tkinter_finder ^
-          --hidden-import=Cairo ^
-          --hidden-import=cairosvg ^
-          --hidden-import=cairocffi ^
-          --exclude-module=tcl ^
-          --exclude-module=tk ^
-          --exclude-module=Tkinter ^
-          --exclude-module=_tkinter ^
-          --collect-all cairosvg ^
-          --collect-all cairocffi ^
-          --collect-data cairo ^
-          --add-binary "dll_deps\libcairo-2.dll;." ^
-          --add-binary "dll_deps\libfontconfig-1.dll;." ^
-          --add-binary "dll_deps\libfreetype-6.dll;." ^
-          --add-binary "dll_deps\libpng16-16.dll;." ^
-          --add-binary "dll_deps\zlib1.dll;." ^
-          --add-binary "dll_deps\libpixman-1-0.dll;." ^
-          --add-binary "dll_deps\libexpat-1.dll;." ^
-          --add-binary "dll_deps\libharfbuzz-0.dll;." ^
-          --add-binary "dll_deps\libbz2-1.dll;." ^
-          --add-binary "dll_deps\libintl-8.dll;." ^
-          --add-binary "dll_deps\libiconv-2.dll;." ^
-          --add-binary "dll_deps\libgcc_s_seh-1.dll;." ^
-          --add-binary "dll_deps\libwinpthread-1.dll;." ^
-          --noupx ^
-          svg2stl.py
+        import os
+        import sys
+        import weasyprint
+        import PyInstaller.__main__
+        from weasyprint.tools.utils import get_gtk_build_path
+        
+        # Получаем путь к GTK-for-Windows вместе с зависимостями
+        gtk_path = get_gtk_build_path()
+        print(f"GTK Path: {gtk_path}")
+        
+        # Генерируем список необходимых DLL-файлов для включения в сборку
+        dll_dir = os.path.join(gtk_path, "bin")
+        print(f"DLL Directory: {dll_dir}")
+        
+        # Проверяем, что директория существует
+        if not os.path.exists(dll_dir):
+            raise FileNotFoundError(f"GTK binaries directory not found: {dll_dir}")
+        
+        # Список DLL-файлов в директории
+        dll_files = [os.path.join(dll_dir, f) for f in os.listdir(dll_dir) if f.endswith(".dll")]
+        print(f"Found {len(dll_files)} DLL files")
+        
+        # Запускаем PyInstaller с необходимыми параметрами и всеми DLL
+        command = [
+            "svg2stl.py",
+            "--onefile",
+            "--clean",
+            "--name=svg2stl-windows.exe", 
+            "--version-file=version_info.txt",
+            "--manifest=uac_manifest.xml",
+            "--hidden-import=PIL._tkinter_finder",
+            "--hidden-import=Cairo",
+            "--hidden-import=cairosvg",
+            "--hidden-import=cairocffi",
+            "--hidden-import=weasyprint",
+            "--collect-all=cairosvg",
+            "--collect-all=cairocffi",
+            "--collect-data=cairo",
+            "--add-data", f"{gtk_path}\\bin;bin",  # Добавляем все бинарные файлы
+            "--exclude-module=tcl",
+            "--exclude-module=tk",
+            "--exclude-module=Tkinter",
+            "--exclude-module=_tkinter",
+            "--noupx",
+            "--runtime-hook", "run_path_hook.py",  # Добавляем файл хука
+        ]
+        
+        # Создаем файл хука для добавления пути к GTK в sys.path во время выполнения
+        with open("run_path_hook.py", "w") as f:
+            f.write("""
+        import os
+        import sys
+        
+        # Добавляем путь к DLL в переменную PATH
+        bin_dir = os.path.join(sys._MEIPASS, 'bin')
+        if os.path.exists(bin_dir):
+            os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
+            print(f"Added {bin_dir} to PATH")
+        """)
+        
+        # Запускаем PyInstaller с собранными параметрами
+        PyInstaller.__main__.run(command)
 
     - name: Загрузить артефакты сборки
       uses: actions/upload-artifact@v4
