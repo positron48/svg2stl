@@ -58,35 +58,79 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: msys2 {0}
       run: |
-        # Создаем директорию для DLL-файлов
-        mkdir -p "$GITHUB_WORKSPACE/dll_libs"
+        # Создаем временную директорию для DLL-файлов
+        mkdir -p "$GITHUB_WORKSPACE/dll_temp"
         
         # Копируем основные DLL-файлы для Cairo и его зависимостей
         echo "Копирование необходимых DLL файлов..."
-        cp -v /mingw64/bin/libcairo-2.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libpixman-1-0.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libfontconfig-1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libfreetype-6.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libpng16-16.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/zlib1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libexpat-1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libharfbuzz-0.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libbz2-1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libwinpthread-1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libgcc_s_seh-1.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libintl-8.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libiconv-2.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libgobject-2.0-0.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libglib-2.0-0.dll "$GITHUB_WORKSPACE/dll_libs/"
-        cp -v /mingw64/bin/libpango-1.0-0.dll "$GITHUB_WORKSPACE/dll_libs/"
+        cp -v /mingw64/bin/libcairo-2.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libpixman-1-0.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libfontconfig-1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libfreetype-6.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libpng16-16.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/zlib1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libexpat-1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libharfbuzz-0.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libbz2-1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libwinpthread-1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libgcc_s_seh-1.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libintl-8.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libiconv-2.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libgobject-2.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libglib-2.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libpango-1.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
+        cp -v /mingw64/bin/libffi-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
+        cp -v /mingw64/bin/libpcre-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
+        cp -v /mingw64/bin/libfribidi-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
         
         # Проверяем копирование
         echo "Проверка скопированных файлов:"
-        ls -la "$GITHUB_WORKSPACE/dll_libs/"
+        ls -la "$GITHUB_WORKSPACE/dll_temp/"
         
         # Проверяем зависимости с помощью ldd
         echo "Проверка зависимостей libcairo-2.dll:"
         ldd /mingw64/bin/libcairo-2.dll
+
+    # Создание патч-файла для cairocffi
+    - name: Создание патч-файла для cairocffi
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        # Создаем патч для cairocffi
+        cat > cairocffi_patch.py << EOF
+        """
+        Патч для cairocffi - позволяет явно указать путь к библиотеке cairo
+        """
+        import os
+        import sys
+        import ctypes
+        import ctypes.util
+        
+        # Сохраняем оригинальную функцию поиска библиотеки
+        original_find_library = ctypes.util.find_library
+        
+        # Определяем собственные пути для поиска библиотек
+        def patched_find_library(name):
+            # Проверяем для конкретных имен библиотек
+            if name in ['cairo', 'cairo-2', 'libcairo-2']:
+                # В PyInstaller сборке библиотеки находятся в основной директории
+                executable_dir = os.path.dirname(sys.executable)
+                possible_paths = [
+                    os.path.join(executable_dir, 'libcairo-2.dll'),
+                    os.path.join(executable_dir, 'cairo-2.dll'),
+                    os.path.join(executable_dir, 'cairo.dll')
+                ]
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        print(f"Found library {name} at {path}")
+                        return path
+            
+            # Если не нашли, используем оригинальный метод поиска
+            return original_find_library(name)
+        
+        # Заменяем стандартную функцию поиска библиотеки на нашу
+        ctypes.util.find_library = patched_find_library
+        EOF
 
     - name: Создание файлов метаданных для Windows
       if: matrix.os == 'windows-latest'
@@ -171,14 +215,37 @@ jobs:
       shell: bash
       run: |
         cat > runtime-hook.py << EOF
+        """
+        Runtime hook для PyInstaller.
+        Запускается при старте приложения для настройки окружения.
+        """
         import os
         import sys
-
-        # Добавляем путь к нашим DLL в переменную PATH
-        dll_path = os.path.join(os.path.dirname(sys.executable), 'dll_libs')
-        if os.path.exists(dll_path):
-            os.environ['PATH'] = dll_path + os.pathsep + os.environ.get('PATH', '')
-            print(f"Added {dll_path} to PATH")
+        import shutil
+        import importlib.machinery
+        
+        # Печатаем информацию о путях для диагностики
+        print(f"Executable directory: {os.path.dirname(sys.executable)}")
+        
+        # Копируем DLL-файлы из временной директории в корневую директорию приложения
+        # Это необходимо, так как многие библиотеки ищут зависимости в директории приложения
+        dll_temp_dir = os.path.join(os.path.dirname(sys.executable), 'dll_temp')
+        if os.path.exists(dll_temp_dir):
+            print(f"Copying DLLs from {dll_temp_dir} to {os.path.dirname(sys.executable)}")
+            for file in os.listdir(dll_temp_dir):
+                if file.endswith('.dll'):
+                    src = os.path.join(dll_temp_dir, file)
+                    dst = os.path.join(os.path.dirname(sys.executable), file)
+                    shutil.copy2(src, dst)
+                    print(f"Copied {src} to {dst}")
+        
+        # Импортируем патч для cairocffi как можно раньше,
+        # до того как cairocffi будет импортирован
+        cairocffi_patch_path = os.path.join(os.path.dirname(sys.executable), 'cairocffi_patch.py')
+        if os.path.exists(cairocffi_patch_path):
+            print(f"Loading cairocffi patch from {cairocffi_patch_path}")
+            loader = importlib.machinery.SourceFileLoader('cairocffi_patch', cairocffi_patch_path)
+            loader.load_module()
         EOF
 
     - name: Сборка с PyInstaller для Linux
@@ -209,12 +276,14 @@ jobs:
           --hidden-import=cairo ^
           --hidden-import=cairosvg ^
           --hidden-import=cairocffi ^
+          --hidden-import=cairo ^
           --exclude-module=tcl ^
           --exclude-module=tk ^
           --exclude-module=Tkinter ^
           --exclude-module=_tkinter ^
+          --add-data "dll_temp;dll_temp" ^
+          --add-data "cairocffi_patch.py;." ^
           --runtime-hook=runtime-hook.py ^
-          --add-data "dll_libs;dll_libs" ^
           --collect-all=cairosvg ^
           --collect-all=cairocffi ^
           --collect-data=cairo ^
