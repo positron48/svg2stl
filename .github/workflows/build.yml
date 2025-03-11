@@ -33,220 +33,28 @@ jobs:
         python-version: '3.8'  # Используем Python 3.8 для лучшей совместимости
         cache: 'pip'
 
-    # Установка зависимостей
-    - name: Установка базовых зависимостей
+    # Установка зависимостей для Linux и macOS
+    - name: Установка базовых зависимостей для Linux/macOS
+      if: matrix.os != 'windows-latest'
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
-    # Установка MSYS2 и GTK3 для Windows
-    - name: Установка GTK3 через MSYS2
+    # Установка зависимостей для Windows
+    - name: Установка зависимостей для Windows
       if: matrix.os == 'windows-latest'
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gtk3
-          mingw-w64-x86_64-cairo
-          mingw-w64-x86_64-glib2
-          mingw-w64-x86_64-pango
-
-    # Копирование DLL-файлов в проект
-    - name: Копирование DLL-файлов из MSYS2
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
       run: |
-        # Создаем временную директорию для DLL-файлов
-        mkdir -p "$GITHUB_WORKSPACE/dll_temp"
-        
-        # Копируем основные DLL-файлы для Cairo и его зависимостей
-        echo "Копирование необходимых DLL файлов..."
-        cp -v /mingw64/bin/libcairo-2.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libpixman-1-0.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libfontconfig-1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libfreetype-6.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libpng16-16.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/zlib1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libexpat-1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libharfbuzz-0.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libbz2-1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libwinpthread-1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libgcc_s_seh-1.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libintl-8.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libiconv-2.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libgobject-2.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libglib-2.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libpango-1.0-0.dll "$GITHUB_WORKSPACE/dll_temp/"
-        cp -v /mingw64/bin/libffi-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
-        cp -v /mingw64/bin/libpcre-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
-        cp -v /mingw64/bin/libfribidi-*.dll "$GITHUB_WORKSPACE/dll_temp/" || true
-        
-        # Проверяем копирование
-        echo "Проверка скопированных файлов:"
-        ls -la "$GITHUB_WORKSPACE/dll_temp/"
-        
-        # Проверяем зависимости с помощью ldd
-        echo "Проверка зависимостей libcairo-2.dll:"
-        ldd /mingw64/bin/libcairo-2.dll
+        python -m pip install --upgrade pip
+        # Устанавливаем pycairo вместо cairosvg - он включает статически скомпилированные библиотеки
+        pip install numpy pillow pycairo numpy-stl tqdm
+        pip install pyinstaller svglib reportlab
 
-    # Создание патч-файла для cairocffi
-    - name: Создание патч-файла для cairocffi
+    # Создаем адаптер для Windows-версии для замены cairosvg
+    - name: Создание cairosvg адаптера для Windows
       if: matrix.os == 'windows-latest'
-      shell: bash
       run: |
-        # Создаем патч для cairocffi
-        cat > cairocffi_patch.py << EOF
-        """
-        Патч для cairocffi - позволяет явно указать путь к библиотеке cairo
-        """
-        import os
-        import sys
-        import ctypes
-        import ctypes.util
-        
-        # Сохраняем оригинальную функцию поиска библиотеки
-        original_find_library = ctypes.util.find_library
-        
-        # Определяем собственные пути для поиска библиотек
-        def patched_find_library(name):
-            # Проверяем для конкретных имен библиотек
-            if name in ['cairo', 'cairo-2', 'libcairo-2']:
-                # В PyInstaller сборке библиотеки находятся в основной директории
-                executable_dir = os.path.dirname(sys.executable)
-                possible_paths = [
-                    os.path.join(executable_dir, 'libcairo-2.dll'),
-                    os.path.join(executable_dir, 'cairo-2.dll'),
-                    os.path.join(executable_dir, 'cairo.dll')
-                ]
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        print(f"Found library {name} at {path}")
-                        return path
-            
-            # Если не нашли, используем оригинальный метод поиска
-            return original_find_library(name)
-        
-        # Заменяем стандартную функцию поиска библиотеки на нашу
-        ctypes.util.find_library = patched_find_library
-        EOF
-
-    - name: Создание файлов метаданных для Windows
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        # Создание файла версии
-        cat > version_info.txt << EOF
-        # UTF-8
-        #
-        # For more details about fixed file info 'ffi' see:
-        # http://msdn.microsoft.com/en-us/library/ms646997.aspx
-        VSVersionInfo(
-          ffi=FixedFileInfo(
-            # filevers и prodvers должны быть всегда кортежами из 4-х 16-битных чисел
-            filevers=(1, 0, 0, 0),
-            prodvers=(1, 0, 0, 0),
-            # Содержит флаг маски для файла
-            mask=0x3f,
-            # Содержит флаг, определяющий тип файла
-            flags=0x0,
-            # ОС, для которой предназначен этот файл
-            OS=0x40004,
-            # Тип файла
-            fileType=0x1,
-            # Подтип файла
-            subtype=0x0,
-            # Дата создания
-            date=(0, 0)
-          ),
-          kids=[
-            StringFileInfo(
-              [
-              StringTable(
-                '040904B0',
-                [StringStruct('CompanyName', 'SVG to STL Converter'),
-                StringStruct('FileDescription', 'SVG to STL Converter Tool'),
-                StringStruct('FileVersion', '1.0.0'),
-                StringStruct('InternalName', 'svg2stl'),
-                StringStruct('LegalCopyright', 'MIT License'),
-                StringStruct('OriginalFilename', 'svg2stl.exe'),
-                StringStruct('ProductName', 'SVG to STL Converter'),
-                StringStruct('ProductVersion', '1.0.0')])
-              ]),
-            VarFileInfo([VarStruct('Translation', [1033, 1200])])
-          ]
-        )
-        EOF
-
-        # Создание файла манифеста Windows
-        cat > uac_manifest.xml << EOF
-        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-        <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-          <assemblyIdentity version="1.0.0.0" processorArchitecture="*" name="svg2stl" type="win32"/>
-          <description>SVG to STL Converter Tool</description>
-          <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
-            <security>
-              <requestedPrivileges>
-                <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
-              </requestedPrivileges>
-            </security>
-          </trustInfo>
-          <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
-            <application>
-              <!-- Windows 10 и Windows Server 2016 -->
-              <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-              <!-- Windows 8.1 и Windows Server 2012 R2 -->
-              <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
-              <!-- Windows 8 и Windows Server 2012 -->
-              <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
-              <!-- Windows 7 и Windows Server 2008 R2 -->
-              <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
-              <!-- Windows Vista и Windows Server 2008 -->
-              <supportedOS Id="{e2011457-1546-43c5-a5fe-008deee3d3f0}"/>
-            </application>
-          </compatibility>
-        </assembly>
-        EOF
-
-    # Создание файла runtime-hook для PyInstaller
-    - name: Создание runtime-hook для PyInstaller
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        cat > runtime-hook.py << EOF
-        """
-        Runtime hook для PyInstaller.
-        Запускается при старте приложения для настройки окружения.
-        """
-        import os
-        import sys
-        import shutil
-        import importlib.machinery
-        
-        # Печатаем информацию о путях для диагностики
-        print(f"Executable directory: {os.path.dirname(sys.executable)}")
-        
-        # Копируем DLL-файлы из временной директории в корневую директорию приложения
-        # Это необходимо, так как многие библиотеки ищут зависимости в директории приложения
-        dll_temp_dir = os.path.join(os.path.dirname(sys.executable), 'dll_temp')
-        if os.path.exists(dll_temp_dir):
-            print(f"Copying DLLs from {dll_temp_dir} to {os.path.dirname(sys.executable)}")
-            for file in os.listdir(dll_temp_dir):
-                if file.endswith('.dll'):
-                    src = os.path.join(dll_temp_dir, file)
-                    dst = os.path.join(os.path.dirname(sys.executable), file)
-                    shutil.copy2(src, dst)
-                    print(f"Copied {src} to {dst}")
-        
-        # Импортируем патч для cairocffi как можно раньше,
-        # до того как cairocffi будет импортирован
-        cairocffi_patch_path = os.path.join(os.path.dirname(sys.executable), 'cairocffi_patch.py')
-        if os.path.exists(cairocffi_patch_path):
-            print(f"Loading cairocffi patch from {cairocffi_patch_path}")
-            loader = importlib.machinery.SourceFileLoader('cairocffi_patch', cairocffi_patch_path)
-            loader.load_module()
-        EOF
+        python .github/workflows/create_cairosvg_adapter.py
 
     - name: Сборка с PyInstaller для Linux
       if: matrix.os == 'ubuntu-20.04'
@@ -270,24 +78,20 @@ jobs:
       shell: cmd
       run: |
         pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
-          --version-file=version_info.txt ^
-          --manifest=uac_manifest.xml ^
           --hidden-import=PIL._tkinter_finder ^
+          --hidden-import=svglib ^
+          --hidden-import=reportlab ^
           --hidden-import=cairo ^
           --hidden-import=cairosvg ^
-          --hidden-import=cairocffi ^
-          --hidden-import=cairo ^
+          --hidden-import=cairosvg.surface ^
+          --hidden-import=cairosvg.compat ^
           --exclude-module=tcl ^
           --exclude-module=tk ^
           --exclude-module=Tkinter ^
           --exclude-module=_tkinter ^
-          --add-data "dll_temp;dll_temp" ^
-          --add-data "cairocffi_patch.py;." ^
-          --runtime-hook=runtime-hook.py ^
-          --collect-all=cairosvg ^
-          --collect-all=cairocffi ^
-          --collect-data=cairo ^
-          --noupx ^
+          --collect-all svglib ^
+          --collect-all reportlab ^
+          --collect-all cairo ^
           svg2stl.py
 
     - name: Загрузить артефакты сборки
