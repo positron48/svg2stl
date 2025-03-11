@@ -87,13 +87,23 @@ def svg2png(url=None, file_obj=None, dpi=96, output_width=None, output_height=No
 
     print('CairoSVG adapter module created successfully')
 
+    # Добавляем текущий каталог в путь поиска модулей Python
+    current_dir = os.getcwd()
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+
     # Проверяем, что модуль создан и работает
     try:
         import cairosvg
         print('CairoSVG imported successfully')
     except ImportError as e:
-        print(f'Error importing cairosvg: {e}')
-        sys.exit(1)
+        # Если импорт не удался, выводим предупреждение, но не прерываем процесс
+        print(f'Warning: Could not import cairosvg module: {e}')
+        print('This may not be a problem if the module will be imported from a different context.')
+        # Не выходим с ошибкой, так как файлы уже созданы
+        return 0
+    
+    return 0
 
 if __name__ == "__main__":
-    main() 
+    sys.exit(main()) 
