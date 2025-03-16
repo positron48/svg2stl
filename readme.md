@@ -12,19 +12,11 @@
 
 Скачайте готовый исполняемый файл для вашей операционной системы из [раздела релизов](https://github.com/YOURNAME/svg-to-stl/releases):
 
-- **Windows**: svg2stl-windows.exe
 - **macOS**: svg2stl-macos
 - **Linux**: svg2stl-linux
 
 После скачивания:
-- **Windows**:
-  - **Способ 1**: Поместите exe-файл в одну папку с вашими SVG-файлами и запустите двойным щелчком. Он обработает все SVG-файлы в этой директории.
-  - **Способ 2**: Запустите через Командную строку или PowerShell для использования параметров командной строки: `svg2stl-windows.exe input.svg --thickness 1.0`
 - **macOS/Linux**: Сделайте файл исполняемым (`chmod +x svg2stl-*`) и затем запустите его через терминал
-
-> **Примечание для пользователей Windows**: Некоторые антивирусы, включая Windows Defender, могут ошибочно помечать исполняемый файл как вредоносный. Это распространенная проблема с Python-приложениями, скомпилированными в автономные исполняемые файлы. Приложение безопасно для использования, но если вы обеспокоены, у вас есть следующие варианты:
-> 1. Добавить исключение в антивирус для файла svg2stl-windows.exe
-> 2. Запустить скрипт напрямую из исходного кода (см. Вариант 2 ниже)
 
 > **Примечание для пользователей Linux**: Бинарные файлы скомпилированы на старых системах Linux (Ubuntu 20.04) для максимальной совместимости с большинством дистрибутивов. Если всё же возникают ошибки, используйте метод запуска из исходного кода.
 
@@ -49,19 +41,6 @@ pip install -r requirements.txt
 python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.025
 ```
 
-## Добавление исключения в Windows Defender
-
-Если Windows Defender блокирует приложение, вы можете добавить исключение:
-
-1. Откройте **Безопасность Windows** (найдите ее в меню Пуск)
-2. Нажмите на **Защита от вирусов и угроз**
-3. В разделе "Параметры защиты от вирусов и угроз" нажмите **Управление параметрами**
-4. Прокрутите вниз до **Исключения** и нажмите **Добавить или удалить исключения**
-5. Нажмите **Добавить исключение** и выберите **Файл**
-6. Найдите и выберите файл svg2stl-windows.exe
-
-Это позволит приложению нормально работать в вашей системе.
-
 ## Особенности
 
 - Преобразование SVG-файлов в высококачественные 3D-модели STL
@@ -78,13 +57,13 @@ python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.025
 ### Преобразование одного SVG-файла:
 
 ```
-svg2stl input.svg --thickness 1.0
+python svg2stl.py input.svg --thickness 1.0
 ```
 
 ### Преобразование всех SVG-файлов в текущем каталоге:
 
 ```
-svg2stl --all --thickness 1.0
+python svg2stl.py --all --thickness 1.0
 ```
 
 ### Параметры:
@@ -135,7 +114,7 @@ svg2stl --all --thickness 1.0
 - **Сверхбыстрая обработка**: `--pixel_size 0.2` (DPI: 150)
 
 ```
-svg2stl input.svg --thickness 1.0 --pixel_size 0.05
+python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
 ```
 
 Благодаря умной обрезке по содержимому и продвинутой оптимизации меша, скрипт обрабатывает только фактические элементы платы и генерирует компактные, оптимизированные STL-файлы.
@@ -154,53 +133,28 @@ svg2stl input.svg --thickness 1.0 --pixel_size 0.05
 
 Преобразование экспорта медного слоя KiCad в STL толщиной 0.8 мм с высоким разрешением (1200 DPI):
 ```
-svg2stl board-F_Cu.svg --thickness 0.8
+python svg2stl.py board-F_Cu.svg --thickness 0.8
 ```
 
 Обработка белых элементов из SVG вместо черных (для негативных/инвертированных дизайнов):
 ```
-svg2stl negative-design.svg --thickness 1.0 --inverted
+python svg2stl.py negative-design.svg --thickness 1.0 --inverted
 ```
 
 Обработка файла со средним разрешением (600 DPI) для ускорения обработки:
 ```
-svg2stl --all --thickness 1.0 --pixel_size 0.05
+python svg2stl.py --all --thickness 1.0 --pixel_size 0.05
 ```
 
 Быстрая обработка большого файла с более низким разрешением (300 DPI):
 ```
-svg2stl large-board.svg --thickness 1.0 --pixel_size 0.1
+python svg2stl.py large-board.svg --thickness 1.0 --pixel_size 0.1
 ```
 
 Сохранение отладочного изображения для проверки обрезки:
 ```
-svg2stl board-F_Cu.svg --thickness 1.0 --debug
+python svg2stl.py board-F_Cu.svg --thickness 1.0 --debug
 ```
-
-## Сборка из исходного кода
-
-Для создания собственного бинарного файла из исходного кода с максимальной совместимостью:
-
-### Linux (для максимальной совместимости)
-```
-# Рекомендуется использовать старые дистрибутивы (например, Ubuntu 18.04 или 20.04)
-pip install pyinstaller
-pyinstaller --onefile --clean --name svg2stl \
-  --hidden-import=PIL._tkinter_finder \
-  --exclude-module=tcl \
-  --exclude-module=tk \
-  --exclude-module=Tkinter \
-  --exclude-module=_tkinter \
-  svg2stl.py
-```
-
-### Windows и macOS
-```
-pip install pyinstaller
-pyinstaller --onefile svg2stl.py
-```
-
-Готовый исполняемый файл будет создан в папке `dist/`.
 
 ## Устранение неполадок
 

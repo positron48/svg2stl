@@ -16,9 +16,6 @@ jobs:
           - os: ubuntu-20.04  # Используем более старую версию Ubuntu для максимальной совместимости
             artifact_name: svg2stl-linux
             asset_name: svg2stl-linux
-          - os: windows-latest
-            artifact_name: svg2stl-windows.exe
-            asset_name: svg2stl-windows
           - os: macos-latest
             artifact_name: svg2stl-macos
             asset_name: svg2stl-macos
@@ -34,26 +31,11 @@ jobs:
         cache: 'pip'
 
     # Установка зависимостей для Linux и macOS
-    - name: Установка базовых зависимостей для Linux/macOS
-      if: matrix.os != 'windows-latest'
+    - name: Установка базовых зависимостей
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-
-    # Установка зависимостей для Windows
-    - name: Установка зависимостей для Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        python -m pip install --upgrade pip
-        pip install numpy pillow numpy-stl tqdm
-        pip install pyinstaller svglib reportlab
-
-    # Запуск скрипта для создания cairosvg-адаптера только для Windows
-    - name: Создание cairosvg адаптера для Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        python .github/workflows/create_cairosvg_adapter.py
 
     - name: Сборка с PyInstaller для Linux
       if: matrix.os == 'ubuntu-20.04'
@@ -71,31 +53,6 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         pyinstaller --onefile --name ${{ matrix.artifact_name }} svg2stl.py
-
-    - name: Сборка с PyInstaller для Windows
-      if: matrix.os == 'windows-latest'
-      shell: cmd
-      run: |
-        REM Проверяем наличие файлов cairosvg
-        dir cairosvg
-        
-        REM Запускаем PyInstaller с расширенными опциями отладки
-        pyinstaller --onefile --clean --name ${{ matrix.artifact_name }} ^
-          --log-level DEBUG ^
-          --hidden-import=PIL._tkinter_finder ^
-          --hidden-import=svglib ^
-          --hidden-import=reportlab ^
-          --hidden-import=cairosvg ^
-          --hidden-import=cairosvg.surface ^
-          --hidden-import=cairosvg.compat ^
-          --exclude-module=tcl ^
-          --exclude-module=tk ^
-          --exclude-module=Tkinter ^
-          --exclude-module=_tkinter ^
-          --collect-all svglib ^
-          --collect-all reportlab ^
-          --paths . ^
-          svg2stl.py
 
     - name: Загрузить артефакты сборки
       uses: actions/upload-artifact@v4
@@ -131,5 +88,4 @@ jobs:
       with:
         files: |
           svg2stl-linux/svg2stl-linux
-          svg2stl-windows/svg2stl-windows.exe
           svg2stl-macos/svg2stl-macos 

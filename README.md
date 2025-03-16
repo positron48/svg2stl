@@ -14,19 +14,11 @@ This tool automates the process of converting SVG files exported from KiCad (wit
 
 Download a ready-to-use executable for your operating system from the [releases section](https://github.com/YOURNAME/svg-to-stl/releases):
 
-- **Windows**: svg2stl-windows.exe
 - **macOS**: svg2stl-macos
 - **Linux**: svg2stl-linux
 
 After downloading:
-- **Windows**:
-  - **Method 1**: Place the .exe file in the same folder as your SVG files and double-click to run it. It will process any SVG file in the same directory.
-  - **Method 2**: Run from Command Prompt or PowerShell to use command-line parameters: `svg2stl-windows.exe input.svg --thickness 1.0`
 - **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
-
-> **Note for Windows users**: Some antivirus software, including Windows Defender, may falsely flag the executable as malicious. This is a common issue with Python applications compiled into standalone executables. The application is safe to use, but if you're concerned, you have these options:
-> 1. Add an exception in your antivirus for the svg2stl-windows.exe file
-> 2. Run the script directly from source code (see Option 2 below)
 
 > **Note for Linux users**: The binaries are compiled on older Linux systems (Ubuntu 20.04) for maximum compatibility with most distributions. If you still encounter errors, please use the source code method below.
 
@@ -51,19 +43,6 @@ Run:
 python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.025
 ```
 
-## Adding an Exception in Windows Defender
-
-If Windows Defender blocks the application, you can add an exception:
-
-1. Open **Windows Security** (search for it in the Start menu)
-2. Click on **Virus & threat protection**
-3. Under "Virus & threat protection settings", click **Manage settings**
-4. Scroll down to **Exclusions** and click **Add or remove exclusions**
-5. Click **Add an exclusion** and select **File**
-6. Browse to and select the svg2stl-windows.exe file
-
-This will allow the application to run normally on your system.
-
 ## Features
 
 - Convert SVG files to high-quality STL 3D models
@@ -87,32 +66,32 @@ This will allow the application to run normally on your system.
 
 Convert a single SVG file:
 ```
-svg2stl input.svg --thickness 1.0
+python svg2stl.py input.svg --thickness 1.0
 ```
 
 Convert all SVG files in the current directory:
 ```
-svg2stl --all --thickness 1.0
+python svg2stl.py --all --thickness 1.0
 ```
 
 Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (1200 DPI):
 ```
-svg2stl board-F_Cu.svg --thickness 0.8
+python svg2stl.py board-F_Cu.svg --thickness 0.8
 ```
 
 Process white elements from SVG instead of black (for negative/inverted designs):
 ```
-svg2stl negative-design.svg --thickness 1.0 --inverted
+python svg2stl.py negative-design.svg --thickness 1.0 --inverted
 ```
 
 Process with medium resolution (600 DPI) for faster processing:
 ```
-svg2stl --all --thickness 1.0 --pixel_size 0.05
+python svg2stl.py --all --thickness 1.0 --pixel_size 0.05
 ```
 
 Quick processing of a large file with lower resolution (300 DPI):
 ```
-svg2stl large-board.svg --thickness 1.0 --pixel_size 0.1
+python svg2stl.py large-board.svg --thickness 1.0 --pixel_size 0.1
 ```
 
 ## Performance Recommendations
@@ -127,31 +106,6 @@ The pixel size (`pixel_size`) fully determines the resolution and detail of the 
 | 0.2 mm     | 150 DPI        | Low     | ~1 MB     | <1 sec          |
 
 The formula used is: `DPI = 30 / pixel_size`
-
-## Building from Source
-
-To create your own binary file from the source code with maximum compatibility:
-
-### Linux (for maximum compatibility)
-```
-# Using an older distribution is recommended (e.g., Ubuntu 18.04 or 20.04)
-pip install pyinstaller
-pyinstaller --onefile --clean --name svg2stl \
-  --hidden-import=PIL._tkinter_finder \
-  --exclude-module=tcl \
-  --exclude-module=tk \
-  --exclude-module=Tkinter \
-  --exclude-module=_tkinter \
-  svg2stl.py
-```
-
-### Windows and macOS
-```
-pip install pyinstaller
-pyinstaller --onefile svg2stl.py
-```
-
-The executable file will be created in the `dist/` folder.
 
 ## Troubleshooting
 
