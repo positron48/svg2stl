@@ -1,28 +1,34 @@
 # SVG to STL Converter
 
-Скрипт на Python для преобразования SVG-файлов (в частности, негативных масок печатных плат, экспортированных из KiCad) в 3D-модели формата STL для фотополимерной печати.
+![2025-04-02_20-06](screens/2025-04-02_20-06.png)
 
-## Описание
+![2025-04-02_20-05](screens/2025-04-02_20-05.png)
 
-Этот инструмент автоматизирует процесс преобразования SVG-файлов, экспортированных из KiCad (с черной заливкой, представляющей негатив маски печатной платы), в точные 3D-модели в формате STL для использования с фотополимерными принтерами, такими как Photon Mono X6KS.
+A Python script for converting SVG files (specifically PCB mask negatives exported from KiCad) to STL 3D models for photopolymer printing.
 
-## Установка и запуск
+[Русская версия документации](readme-ru.md)
 
-### Вариант 1: Готовые бинарные файлы
+## Description
 
-Скачайте готовый исполняемый файл для вашей операционной системы из [раздела релизов](https://github.com/YOURNAME/svg-to-stl/releases):
+This tool automates the process of converting SVG files exported from KiCad (with black fill representing the PCB mask negative) into accurate 3D models in STL format for use with photopolymer printers like the Photon Mono X6KS.
+
+## Installation & Usage
+
+### Option 1: Pre-built Binaries
+
+Download a ready-to-use executable for your operating system from the [releases section](https://github.com/YOURNAME/svg-to-stl/releases):
 
 - **macOS**: svg2stl-macos
 - **Linux**: svg2stl-linux
 
-После скачивания:
-- **macOS/Linux**: Сделайте файл исполняемым (`chmod +x svg2stl-*`) и затем запустите его через терминал
+After downloading:
+- **macOS/Linux**: Make the file executable (`chmod +x svg2stl-*`) and then run it through the terminal
 
-> **Примечание для пользователей Linux**: Бинарные файлы скомпилированы на старых системах Linux (Ubuntu 20.04) для максимальной совместимости с большинством дистрибутивов. Если всё же возникают ошибки, используйте метод запуска из исходного кода.
+> **Note for Linux users**: The binaries are compiled on older Linux systems (Ubuntu 20.04) for maximum compatibility with most distributions. If you still encounter errors, please use the source code method below.
 
-### Вариант 2: Запуск из исходного кода
+### Option 2: Run from Source Code
 
-Требуется Python 3.7 или выше и следующие пакеты:
+Requires Python 3.7 or higher and the following packages:
 ```
 numpy
 cairosvg
@@ -31,136 +37,67 @@ numpy-stl
 tqdm
 ```
 
-Установка зависимостей:
+Install dependencies:
 ```
 pip install -r requirements.txt
 ```
 
-Запуск:
+Run:
 ```
 python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.025
 ```
 
-## Особенности
+## Features
 
-- Преобразование SVG-файлов в высококачественные 3D-модели STL
-- Точное определение и извлечение только черных элементов из SVG (трасс и контуров плат)
-- Автоматическая обрезка до фактических границ содержимого, значительно уменьшающая размер модели
-- Продвинутая оптимизация 3D-модели с объединением смежных пикселей в минимальное количество прямоугольников
-- Обработка отдельных файлов или всех SVG-файлов в каталоге
-- Настраиваемые параметры для толщины и размера пикселя (разрешения)
-- Автоматический расчет оптимального DPI для растеризации на основе размера пикселя
-- Индикатор прогресса для отслеживания процесса конвертации
+- Convert SVG files to STL 3D models
+- Precise extraction of only black elements from SVG (PCB traces and outlines)
+- Automatic cropping to actual content boundaries, significantly reducing model size
+- Advanced 3D model optimization by merging adjacent pixels into a minimal number of rectangles
+- Process individual files or all SVG files in the current directory
+- Configurable parameters for thickness and pixel size (resolution)
+- Automatic calculation of optimal DPI for rasterization based on pixel size
+- Progress indicator for tracking the conversion process
 
-## Использование
+## Command Line Arguments
 
-### Преобразование одного SVG-файла:
+- `--thickness`: Thickness of the resulting 3D model in mm (default: 1.0)
+- `--pixel_size`: Size of each pixel in mm (default: 0.025). Determines rasterization resolution and model detail
+- `--debug`: Save debug images for check
+- `--all`: Process all SVG files in the current directory
+- `--inverted`: Extract white pixels instead of black (useful for negative images or light-on-dark designs)
 
+## Examples
+
+Convert a single SVG file:
 ```
 python svg2stl.py input.svg --thickness 1.0
 ```
 
-### Преобразование всех SVG-файлов в текущем каталоге:
-
+Convert all SVG files in the current directory:
 ```
 python svg2stl.py --all --thickness 1.0
 ```
 
-### Параметры:
-
-- `--thickness`: Толщина результирующей 3D-модели в мм (по умолчанию: 1.0)
-- `--pixel_size`: Размер каждого пикселя в мм (по умолчанию: 0.025). Определяет разрешение растеризации и детализацию модели
-- `--debug`: Сохранять отладочные изображения для проверки
-- `--all`: Обработать все SVG-файлы в текущем каталоге
-- `--inverted`: Извлекать белые пиксели вместо черных (полезно для негативных изображений или светлых элементов на темном фоне)
-
-## Расчет разрешения
-
-Скрипт автоматически рассчитывает оптимальное значение DPI на основе размера пикселя, чтобы обеспечить точные размеры STL-модели:
-
-| Размер пикселя | Рассчитанный DPI | Качество | Размер файла | Время обработки |
-|----------------|------------------|----------|--------------|-----------------|
-| 0.025 мм       | 1200 DPI         | Очень высокое | ~5 МБ | ~4 сек |
-| 0.05 мм        | 600 DPI          | Высокое  | ~3 МБ | ~2 сек |
-| 0.1 мм         | 300 DPI          | Среднее  | ~2 МБ | ~1 сек |
-| 0.2 мм         | 150 DPI          | Низкое   | ~1 МБ | <1 сек |
-
-Используется формула: `DPI = 30 / pixel_size`
-
-## Оптимизация 3D-модели
-
-Скрипт использует двухуровневый алгоритм оптимизации для объединения смежных пикселей в минимальное количество прямоугольных блоков:
-
-1. **Поиск максимальных прямоугольников**: Находит все возможные прямоугольники, которые могут быть созданы из смежных пикселей.
-
-2. **Жадное покрытие площади**: Объединяет найденные прямоугольники, начиная с самых больших и избегая избыточного перекрытия:
-   - Прямоугольники сортируются по площади от большего к меньшему
-   - Прямоугольники, полностью перекрытые другими, отбрасываются
-   - Маленькие прямоугольники объединяются в более крупные блоки
-
-Результаты оптимизации впечатляют:
-- **До оптимизации**: ~175 000 прямоугольников (по одному на каждый пиксель)
-- **После оптимизации**: ~3 000 прямоугольников (сокращение в ~60 раз)
-
-Это позволяет создавать очень компактные STL-файлы (1-5 MB) даже для моделей с высоким разрешением, сохраняя при этом высокую точность и скорость обработки.
-
-## Рекомендации по производительности
-
-Размер пикселя (`pixel_size`) полностью определяет разрешение и детализацию модели:
-
-- **Очень высокое качество и точность**: `--pixel_size 0.025` (DPI: 1200) - значение по умолчанию
-- **Хороший баланс качества и производительности**: `--pixel_size 0.05` (DPI: 600)
-- **Быстрая обработка с приемлемым качеством**: `--pixel_size 0.1` (DPI: 300)
-- **Сверхбыстрая обработка**: `--pixel_size 0.2` (DPI: 150)
-
-```
-python svg2stl.py input.svg --thickness 1.0 --pixel_size 0.05
-```
-
-Благодаря умной обрезке по содержимому и продвинутой оптимизации меша, скрипт обрабатывает только фактические элементы платы и генерирует компактные, оптимизированные STL-файлы.
-
-## Процесс преобразования
-
-1. SVG-файл растеризуется в PNG-изображение с разрешением DPI, рассчитанным на основе размера пикселя
-2. Выполняется извлечение только черных элементов из SVG (трасс и контуров плат)
-3. Изображение автоматически обрезается до фактических границ содержимого, игнорируя пустые поля
-4. Создается бинарная маска, представляющая тело печатной платы
-5. В маске выполняется поиск и оптимизация максимальных прямоугольников
-6. Для каждого прямоугольника создается 3D-блок с заданной толщиной
-7. Все блоки объединяются в единую 3D-модель, которая сохраняется в STL-формате
-
-## Примеры
-
-Преобразование экспорта медного слоя KiCad в STL толщиной 0.8 мм с высоким разрешением (1200 DPI):
+Convert a KiCad copper layer export to a 0.8mm thick STL with high resolution (1200 DPI):
 ```
 python svg2stl.py board-F_Cu.svg --thickness 0.8
 ```
 
-Обработка белых элементов из SVG вместо черных (для негативных/инвертированных дизайнов):
+Process white elements from SVG instead of black (for negative/inverted designs):
 ```
 python svg2stl.py negative-design.svg --thickness 1.0 --inverted
 ```
 
-Обработка файла со средним разрешением (600 DPI) для ускорения обработки:
+Process with medium resolution (600 DPI) for faster processing:
 ```
 python svg2stl.py --all --thickness 1.0 --pixel_size 0.05
 ```
 
-Быстрая обработка большого файла с более низким разрешением (300 DPI):
+Quick processing of a large file with lower resolution (300 DPI):
 ```
 python svg2stl.py large-board.svg --thickness 1.0 --pixel_size 0.1
 ```
 
-Сохранение отладочного изображения для проверки обрезки:
-```
-python svg2stl.py board-F_Cu.svg --thickness 1.0 --debug
-```
+### Example files
 
-## Устранение неполадок
-
-### Проблемы совместимости на Linux
-
-Если вы столкнулись с ошибками вида `GLIBC_2.xx not found`, это означает, что бинарный файл был собран с более новой версией библиотек Linux, чем доступны в вашей системе. Используйте одно из этих решений:
-
-1. Запустите скрипт напрямую с Python (Вариант 2)
-2. Соберите собственный бинарный файл с помощью PyInstaller на вашей системе, используя инструкции выше
+[caretaker-F_Cu.svg](caretaker-F_Cu.svg) > [caretaker-F_Cu.stl](caretaker-F_Cu.svg)
