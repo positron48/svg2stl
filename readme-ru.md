@@ -96,4 +96,4 @@ python svg2stl.py board-F_Cu.svg --thickness 1.0 --debug
 
 ### Примеры файлов
 
-[caretaker-F_Cu.svg](caretaker-F_Cu.svg) > [caretaker-F_Cu.stl](caretaker-F_Cu.svg)
+[caretaker-F_Cu.svg](caretaker-F_Cu.svg) > [caretaker-F_Cu.stl](caretaker-F_Cu.stl)

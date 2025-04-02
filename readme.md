@@ -100,4 +100,4 @@ python svg2stl.py large-board.svg --thickness 1.0 --pixel_size 0.1
 
 ### Example files
 
-[caretaker-F_Cu.svg](caretaker-F_Cu.svg) > [caretaker-F_Cu.stl](caretaker-F_Cu.svg)
+[caretaker-F_Cu.svg](caretaker-F_Cu.svg) > [caretaker-F_Cu.stl](caretaker-F_Cu.stl)
