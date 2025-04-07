@@ -6,7 +6,7 @@
 
 A Python script for converting SVG files (specifically PCB mask negatives exported from KiCad) to STL 3D models for photopolymer printing.
 
-[Blogpost about photoresist on SLA with this tool](https://positroid.tech/post/caretaker-part-3-photoresist)
+[Blogpost about photoresist on SLA with this tool](https://positroid.tech/en/post/caretaker-part-3-photoresist)
 
 [Русская версия документации](readme-ru.md)
 
